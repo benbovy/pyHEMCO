@@ -10,6 +10,8 @@
 """
 A Python API for the Harvard Emissions Component (HEMCO) of GEOS-Chem.
 
+Not yet operational.
+
 """
 
 import os
@@ -17,8 +19,8 @@ from copy import copy, deepcopy
 
 import numpy as np
 
-from timetools import strp_datetimeslicer
-from datatypes import ObjectCollection
+from pyhemco.timetools import strp_datetimeslicer
+from pyhemco.datatypes import ObjectCollection
 
 
 BUILTIN_SETTINGS_PATH = 'path/to/default/settings/files'
