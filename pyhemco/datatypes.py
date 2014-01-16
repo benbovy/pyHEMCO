@@ -14,14 +14,15 @@ Misc classes for generic data structures.
 
 class ObjectCollection(object):
     """
-    An ordered collection of objects that all belong to a same class.
+    An ordered collection of unique objects that all belong to a same class.
     
     It is possible to select one or more objects in the collection
     using their attributes. It is also easy to remove, replace or
     duplicate selected objects. Callbacks can be set for adding/removing
     objects to/from the collection.
     
-    This class may be useful for nested data structures. 
+    This class may be useful for nested data structures (a collection may
+    contain itself other collections)s.
     
     Parameters
     ----------
@@ -93,7 +94,7 @@ class ObjectCollection(object):
         return self._ref_collection
     
     def _check_read_only(self):
-        if self.read_only:
+        if self._read_only:
             # TODO: raise a custom Exception
             raise ValueError("Operation not permitted on "
                              "read-only collections")
@@ -144,7 +145,7 @@ class ObjectCollection(object):
         # call remove then add rather than direct replacement due to callbacks
         # and class checking.
         self.remove()
-        self.add(new_obj, index=obj_index)
+        ref.add(new_obj, index=obj_index)
     
     def duplicate(self, **kwargs):
         """
@@ -202,7 +203,7 @@ class ObjectCollection(object):
             sorted_objects = sorted(self._list, key=key)
         except TypeError:
             sorted_objects = sorted(self._list,
-                                    key=lambda obj: getattr(obj, attr_name))
+                                    key=lambda obj: getattr(obj, key))
         return self._create_subcollection(sorted_objects)
     
     def filter(self, *args, **kwargs):
@@ -235,14 +236,14 @@ class ObjectCollection(object):
         :meth:`get_object`
         :prop:`ref_collection`
         """
-        sel_objects = self._list
+        selection = self._list
         for func in args:
-            sel_objects = filter(func, sel_objects)
-        for attr_name, attr_value in kwargs.items():
-            sel_objects = filter(lambda obj: getattr(obj, attr_name) == value,
-                                 sel_objects)
-        return self._create_subcollection(sel_objects)
-    
+            selection = filter(func, selection)
+        for attr_name, attr_val in kwargs.items():
+            selection = filter(lambda obj: getattr(obj, attr_name) == attr_val,
+                               selection)
+        return self._create_subcollection(selection)
+
     def get(self, *args, **kwargs):
         """
         Select one object based on its attributes.
@@ -277,7 +278,7 @@ class ObjectCollection(object):
             raise ValueError("No object match the selection criteria")
         else:
             return selection
-    
+
     def get_object(self, *args, **kwargs):
         """
         Select one object based on its attributes.
