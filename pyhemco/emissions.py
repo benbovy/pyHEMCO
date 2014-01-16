@@ -27,10 +27,12 @@ BUILTIN_SETTINGS_PATH = 'path/to/default/settings/files'
 BASE_EM_ATTR_NAME = 'emission_base'
 SF_ATTR_NAME = 'emission_scale_factor'
 
+
 #-----------------------------------------------------------------------------
 # Generic classes or functions (not part of the public HEMCO API)
 # will be replaced or moved elsewhere.
 #-----------------------------------------------------------------------------
+
 
 class GCField(object):
     """
@@ -52,15 +54,14 @@ class GCField(object):
         Field data.
     
     """
-    def __init__(self, name, standard_name='', ndim=0, unit='', filename='',
-                 data=[], **kwargs):
+    def __init__(self, name, standard_name='', ndim=0, unit='',
+                 filename='', data=[], **kwargs):
         self.name = str(name)
         self.standard_name = str(standard_name)
         self.ndim = int(ndim)
         self.unit = str(unit)
         self.filename = filename
         self.filepath = os.path.abspath(self.filename)
-        self.timestamp = timestamp
         self.data = np.array(data)
         self.attributes = dict()
         self.attributes.update(kwargs)
@@ -148,10 +149,10 @@ def base_emission_field(gc_field, name, timestamp, species, category,
     e_attr = {'name': str(name),
               'timestamp': str(strp_datetimeslicer(timestamp)),
               'species': species,
-              'category' : int(category),
-              'hierarchy' : int(hierarchy),
-              'extension' : extension,
-              'scale_factors' : scale_factors}
+              'category': int(category),
+              'hierarchy': int(hierarchy),
+              'extension': extension,
+              'scale_factors': scale_factors}
     
     e_field = _add_emission_attr(gc_field, name, BASE_EM_ATTR_NAME,
                                  e_attr, copy)
@@ -223,8 +224,8 @@ def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
     sf_attr = {'name': str(name),
                'timestamp': str(strp_datetimeslicer(timestamp)),
                'operator': 'mul',
-               'mask_window' : mask_window,
-               'mirror' : bool(mirror)}
+               'mask_window': mask_window,
+               'mirror': bool(mirror)}
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
     return e_field
@@ -296,7 +297,7 @@ class Emissions(object):
         --------
         :class:`utils.data_struct.ObjectCollection`
         """
-        return self._base_emissions
+        return self._base_emission_fields
     
     @property
     def scale_factors(self):
@@ -309,7 +310,7 @@ class Emissions(object):
         in the collection).
         """
         scale_factors = []
-        for field in self.base_emissions:
+        for field in self.base_emission_fields:
             e_attr = field.attributes['emission_base']
             e_sf_list = e_attr.get('emission_scale_factors', [])
             scale_factors.extend(e_sf_list)
