@@ -46,18 +46,19 @@ class ObjectCollection(object):
     
     An object cannot be inserted more than once in a collection.
     """
+
     def __init__(self, ref_class, objects=[], callbacks=(None, None),
                  read_only=False):
-        
+
         self._ref_class = ref_class
         self._list = []
         self._callback_add, self._callback_remove = callbacks
         self._ref_collection = None
         self._read_only = read_only
-        
+
         for obj in objects:
             self.add(obj)
-    
+
     @property
     def ref_collection(self):
         """
@@ -70,7 +71,7 @@ class ObjectCollection(object):
         this collection will affect the reference collection only !
         """
         return self._ref_collection
-    
+
     def _create_subcollection(self, sel_objects):
         """
         Create a new collection of (selected) objects from this collection
@@ -83,7 +84,7 @@ class ObjectCollection(object):
         else:
             selection._ref_collection = self._ref_collection
         return selection
-    
+
     def _get_ref_collection_or_error(self, get=False):
         if self._ref_collection is None:
             raise TypeError("Invalid collection: the collection must be "
@@ -92,13 +93,13 @@ class ObjectCollection(object):
             raise TypeError("Invalid collection: the collection must be "
                             "returned by the 'get' method")
         return self._ref_collection
-    
+
     def _check_read_only(self):
         if self._read_only:
             # TODO: raise a custom Exception
             raise ValueError("Operation not permitted on "
                              "read-only collections")
-    
+
     def add(self, obj, index=-1):
         """
         Add a new object to the collection.
@@ -121,19 +122,20 @@ class ObjectCollection(object):
         """
         self._check_read_only()
         if not isinstance(obj, self._ref_class):
-            raise TypeError("Cannot add object of class '%s' in a "
-                            "collection of only '%s' objects"
-                            % (type(obj).__name__, self._ref_class.__name__))
+            raise TypeError("Cannot add object of class '{0}' in a "
+                            "collection of only '{1}' objects"
+                            .format(type(obj).__name__,
+                                    self._ref_class.__name__))
         if obj in self._list:
             raise ValueError("Not allowed to add an object which is already "
                              "in the collection")
         if index == -1:
             self._list.append(obj)
         else:
-            self._list.insert(index, obj) 
+            self._list.insert(index, obj)
         if self._callback_add is not None:
             self._callback_add(obj)
-    
+
     def replace(self, new_obj):
         """
         Replace a given, selected object with
@@ -146,7 +148,7 @@ class ObjectCollection(object):
         # and class checking.
         self.remove()
         ref.add(new_obj, index=obj_index)
-    
+
     def duplicate(self, **kwargs):
         """
         Duplicate a given, selected object with changed attribute values
@@ -155,7 +157,7 @@ class ObjectCollection(object):
         self._check_read_only()
         ref = self._get_ref_collection_or_error(get=True)
         # TODO: object copy + change attributes with kwargs + call 'add' method
-    
+
     def remove(self):
         """
         Remove selected objects in the reference collection.
@@ -166,14 +168,14 @@ class ObjectCollection(object):
             ref._list.remove(obj)
             if ref._callback_remove is not None:
                 ref._callback_remove(obj)
-    
+
     def index(self):
         """
         Get the indexes of selected objects in the reference collection.
         """
         ref = self._get_ref_collection_or_error()
         return [ref._list.index(obj) for obj in self._list]
-    
+
     def sorted(self, key):
         """
         Sort objects in the collection.
@@ -205,7 +207,7 @@ class ObjectCollection(object):
             sorted_objects = sorted(self._list,
                                     key=lambda obj: getattr(obj, key))
         return self._create_subcollection(sorted_objects)
-    
+
     def filter(self, *args, **kwargs):
         """
         Select objects in the collection based on their attributes.
@@ -294,7 +296,7 @@ class ObjectCollection(object):
         selection = self.get(*args, **kwargs)
         obj = selection._list[0]
         return obj
-    
+
     def __setitem__(self, index, new_obj):
         # not the most efficient, but also not the preferred way to
         # replace an object in the collection.
@@ -309,24 +311,21 @@ class ObjectCollection(object):
         # remove an object from the collection.
         del_obj = self._list[index]
         self.get(lambda obj: obj == del_obj).remove()
-    
+
     def __len__(self):
-        return len(self._list)    
-    
+        return len(self._list)
+
     def __iter__(self):
         return iter(self._list)
-    
+
     def __str__(self):
-        sel_text = ""
-        if self._ref_collection is not None:
-            sel_text = "selected"
-        return "Collection of %s objects: %s" % (self._ref_class.__name__,
-                                                 str(self._list))
-    
+        return "Collection of {0} objects{1}: {2}" \
+            .format(self._ref_class.__name__,
+                    ' (selection)' if self._ref_collection is not None else '',
+                    '\n'.join(str(obj) for obj in self._list))
+
     def __repr__(self):
-        sel_text = ""
-        if self._ref_collection is not None:
-            sel_text = "selected objects"
-        return "%s[%s](%s)" % (self.__class__.__name__,
-                               sel_text,
-                               list.__repr__(self._list))
+        return "<{0}{1}: {2}>"\
+            .format(self.__class__.__name__,
+                    ' (selection)' if self._ref_collection is not None else '',
+                    list.__repr__(self._list))

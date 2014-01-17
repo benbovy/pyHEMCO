@@ -88,7 +88,7 @@ class DatetimeSlicer(object):
         """Change duration of each time slice."""
         if not self._has_emptylist:
             raise ValueError("found empty list with non empty "
-                             "list(s) for shorter time spans" % str_)
+                             "list(s) for shorter time spans")
         self._interval = interval
         self._freq = freq
         self._has_emptylist = True
@@ -125,7 +125,7 @@ class DatetimeSlicer(object):
         try:
             args = cls._parse_fmt(fmt)
         except (ValueError, TypeError):
-            raise ValueError("Invalid string '%s'" % fmt)
+            raise ValueError("Invalid string '{}'".format(fmt))
         return cls(*args)
     
     def to_string(self):
@@ -143,9 +143,9 @@ class DatetimeSlicer(object):
                 str_list.append(self._str_wildcard_char)
             else:
                 if dt_elem == list(range(min(dt_elem), max(dt_elem) + 1)):
-                    str_list.append("%d%s%d",
-                                    (min(dt_elem), max(dt_elem),
-                                     self._str_range_sep))
+                    str_list.append("{0}{1}{2}".format(min(dt_elem),
+                                                       self._str_range_sep,
+                                                       max(dt_elem)))
                 else:
                     str_list.append(self._str_value_sep.join(dt_elem))
         return self._str_dt_sep.join(str_list)
@@ -171,7 +171,7 @@ class DatetimeSlicer(object):
         return self.to_string()
     
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.to_string())
+        return "<{0}: {1}>".format(self.__class__.__name__, self.to_string())
 
 
 #-----------------------------------------------------------------------------

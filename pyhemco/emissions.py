@@ -54,6 +54,7 @@ class GCField(object):
         Field data.
     
     """
+
     def __init__(self, name, standard_name='', ndim=0, unit='',
                  filename='', data=[], **kwargs):
         self.name = str(name)
@@ -65,21 +66,20 @@ class GCField(object):
         self.data = np.array(data)
         self.attributes = dict()
         self.attributes.update(kwargs)
-    
+
     def copy(self, copy_data=False):
         """Return a new copy of the Field."""
         if copy_data:
             return deepcopy(self)
         else:
             return copy(self)
-    
+
     def __str__(self):
-        # TODO:
-        pass
-    
+        return 'GCField {}'.format(self.name or self.standard_name)
+
     def __repr__(self):
-        # TODO:
-        pass
+        return '<{0}: {1}>'.format(self.__class__.__name__,
+                                   self.name or self.standard_name)
 
 
 #-----------------------------------------------------------------------------
@@ -96,14 +96,14 @@ def _add_emission_attr(gc_field, name, attr_name, attr_val, copy):
     if any(a in f_attrs for a in e_attrs):
         # TODO: raise custom Exception (for example 'InvalidFieldException')
         raise ValueError("gc_field has already an emission attribute")
-    
+
     if copy:
         e_field = gc_field.copy()
         e_field.name = str(name)
     else:
         e_field = gc_field
     e_field.attributes[attr_name] = attr_val
-    
+
     return e_field
 
 
@@ -152,8 +152,9 @@ def base_emission_field(gc_field, name, timestamp, species, category,
               'category': int(category),
               'hierarchy': int(hierarchy),
               'extension': extension,
-              'scale_factors': scale_factors}
-    
+              'scale_factors': scale_factors,
+              'id': field_id}
+
     e_field = _add_emission_attr(gc_field, name, BASE_EM_ATTR_NAME,
                                  e_attr, copy)
     return e_field
@@ -186,7 +187,7 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False):
     sf_attr = {'name': str(name),
                'timestamp': str(strp_datetimeslicer(timestamp)),
                'operator': operator}
-    
+
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
     return e_field
@@ -229,7 +230,7 @@ def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
     return e_field
-    
+
 
 class EmissionExt(object):
     """
@@ -242,11 +243,21 @@ class EmissionExt(object):
     enabled : bool
         True if the extension is enabled
     """
+
     def __init__(self, name, enabled=True):
         self._number = None      # not public, defined while loading/saving
-                                 # emission settings
+        # emission settings
         self.name = str(name)
         self.enabled = bool(enabled)
+
+    def __str__(self):
+        return "GC-Emission extension '{0}' ({1})" \
+            .format(self.name, self._number or 'no-id')
+
+    def __repr__(self):
+        return '<{0}: {1} ({2})>'.format(self.__class__.__name__,
+                                         self.name,
+                                         self._number or 'no-id')
 
 
 class Emissions(object):
@@ -269,6 +280,7 @@ class Emissions(object):
     **kwargs
         Specify any additional settings by name=value.
     """
+
     def __init__(self, extensions=[], base_emission_fields=[], description="",
                  **kwargs):
         self._extensions = ObjectCollection(EmissionExt, extensions)
@@ -276,7 +288,7 @@ class Emissions(object):
                                                       base_emission_fields)
         self.description = str(description)
         self.settings = kwargs
-    
+
     @property
     def extensions(self):
         """
@@ -287,7 +299,7 @@ class Emissions(object):
         :class:`utils.data_struct.ObjectCollection`
         """
         return self._extensions
-    
+
     @property
     def base_emission_fields(self):
         """
@@ -298,7 +310,7 @@ class Emissions(object):
         :class:`utils.data_struct.ObjectCollection`
         """
         return self._base_emission_fields
-    
+
     @property
     def scale_factors(self):
         """
@@ -315,7 +327,7 @@ class Emissions(object):
             e_sf_list = e_attr.get('emission_scale_factors', [])
             scale_factors.extend(e_sf_list)
         return ObjectCollection(GCField, set(scale_factors), read_only=True)
-    
+
     @classmethod
     def load(cls, filename):
         """
@@ -328,7 +340,7 @@ class Emissions(object):
         """
         # TODO: (not yet implemented)
         pass
-    
+
     @classmethod
     def builtin(cls, settings):
         """
@@ -340,7 +352,7 @@ class Emissions(object):
         """
         settings_file = os.path.join(BUILTIN_SETTINGS_PATH, settings)
         return cls.load(settings_file)
-    
+
     def save(self, filename):
         """
         Save emission settings to an HEMCO-formatted input file given by
@@ -351,15 +363,15 @@ class Emissions(object):
         for sf in self.scale_factors:
             sf._id = inc
             inc += 1
-        
+
         # reset extension numbers
         inc = 101
         for ext in self.extensions:
             ext._number = inc
             inc += 1
-        
-        # TODO: (not yet implemented)
-    
+
+            # TODO: (not yet implemented)
+
     def compute_emissions(self, time, grid):
         """
         Call here the Python-wrapped FORTRAN routine to calculate emissions
@@ -371,7 +383,13 @@ class Emissions(object):
         """
         # TODO: (not yet implemented)
         pass
-        
+
+    def __str__(self):
+        return "GC-Emission settings: {0}".format(self.description)
+
+    def __repr__(self):
+        return repr(self)
+
 
 def load_emissions_file(filename):
     """
