@@ -13,7 +13,7 @@ Miscellaneous routine(s) for time calculations and conversions
 import itertools
 from datetime import datetime
 from dateutil import rrule
-from dateutil import relativedelta
+from dateutil.relativedelta import relativedelta
 
 
 #-----------------------------------------------------------------------------
@@ -42,10 +42,10 @@ class DatetimeSlicer(object):
     
     Notes
     -----
-    By default, all slices are time spans of 1 hour. If an empty list is
-    given for `hours` (resp. `days`, `months`, `years`), slices will have
-    a duration of 1 day (resp. 1 month, 1 year, max duration allowed by the
-    Python's built-in `datetime` module).
+    By default, all slices are time spans of 1 hour. If no value (i.e., an
+    empty list) is given for `hours` (resp. `days`, `months` or `years`),
+    slices will have a duration of 1 day (resp. 1 month, 1 year or max duration
+    allowed by the Python's built-in `datetime` module).
     
     See Also
     --------
@@ -72,11 +72,12 @@ class DatetimeSlicer(object):
         
         # ensure that an empty list will be followed by other empty list too
         # and set the fixed duration of time slice.
-        self._interval = relativedelta(hours=+1)  
+        self._interval = relativedelta(hours=+1)
         self._freq = rrule.HOURLY
-        self._has_emptylist = False
+        self._short_timespan_has_values = True
         if not self.hours:
-            self._change_timespan(rrule.DAILY, relativedelta(days=+1))
+            self._change_timespan(rrule.DAILY, relativedelta(days=+1),
+                                  check_short_timespan=False)
         if not self.days:
             self._change_timespan(rrule.MONTHLY, relativedelta(months=+1))
         if not self.months:
@@ -84,14 +85,14 @@ class DatetimeSlicer(object):
         if not self.years:
             self._change_timespan(None, None)
     
-    def _change_timespan(self, freq, interval):
+    def _change_timespan(self, freq, interval, check_short_timespan=True):
         """Change duration of each time slice."""
-        if not self._has_emptylist:
-            raise ValueError("found empty list with non empty "
-                             "list(s) for shorter time spans")
+        if self._short_timespan_has_values and check_short_timespan:
+            raise ValueError("can't set no value for a time span with "
+                             "values set for shorter time spans")
         self._interval = interval
         self._freq = freq
-        self._has_emptylist = True
+        self._short_timespan_has_values = False
     
     @classmethod
     def _parse_fmt(self, fmt):
@@ -101,6 +102,7 @@ class DatetimeSlicer(object):
         for str_elem in str_list:
             dt_elem = []
             if str_elem == self._str_wildcard_char:
+                args.append(dt_elem)
                 continue
             for val in str_elem.split(self._str_value_sep):
                 try:
@@ -141,13 +143,15 @@ class DatetimeSlicer(object):
         for dt_elem in (self.years, self.months, self.days, self.hours):
             if not dt_elem:
                 str_list.append(self._str_wildcard_char)
-            else:
-                if dt_elem == list(range(min(dt_elem), max(dt_elem) + 1)):
-                    str_list.append("{0}{1}{2}".format(min(dt_elem),
+            elif len(dt_elem) == 1:
+                str_list.append(str(dt_elem[0]))
+            elif dt_elem == list(range(min(dt_elem), max(dt_elem) + 1)):
+                str_list.append("{0:d}{1}{2:d}".format(min(dt_elem),
                                                        self._str_range_sep,
                                                        max(dt_elem)))
-                else:
-                    str_list.append(self._str_value_sep.join(dt_elem))
+            else:
+                str_list.append(self._str_value_sep.join(
+                    [str(e) for e in dt_elem]))
         return self._str_dt_sep.join(str_list)
     
     def __iter__(self):
@@ -161,7 +165,7 @@ class DatetimeSlicer(object):
                 from_dt = datetime(year, min(months), min(days), min(hours))
                 to_dt = datetime(year, max(months), max(days), max(hours))
                 dt_slices = rrule.rrule(self._freq,
-                                        dstart=from_dt, until=to_dt,
+                                        dtstart=from_dt, until=to_dt,
                                         bymonth=months, bymonthday=days,
                                         byhour=hours)
                 for dt in dt_slices:
@@ -208,8 +212,8 @@ def strp_datetimeslicer(fmt):
      (datetime.datetime(2012, 2, 1, 0, 0), datetime.datetime(2012, 2, 1, 1, 0)),
      (datetime.datetime(2012, 3, 1, 0, 0), datetime.datetime(2012, 3, 1, 1, 0))]
     >>> list(strp_datetimeslicer('2013/6/1,5/*'))
-    [(datetime.datetime(2013, 6, 1, 0, 0), datetime.datetime(2010, 6, 2, 0, 0)),
-     (datetime.datetime(2010, 6, 5, 0, 0), datetime.datetime(2010, 6, 6, 0, 0))]
+    [(datetime.datetime(2013, 6, 1, 0, 0), datetime.datetime(2013, 6, 2, 0, 0)),
+     (datetime.datetime(2013, 6, 5, 0, 0), datetime.datetime(2013, 6, 6, 0, 0))]
     >>> list(strp_datetimeslicer('2013/*/*/*'))
     [(datetime.datetime(2013, 1, 1, 0, 0), datetime.datetime(2014, 1, 1, 0, 0))]
     """
