@@ -39,7 +39,7 @@ class TestDatetimeSlicer(unittest.TestCase):
         self.dtslicer4 = {'strp': '2013/*/*/1'}
 
         self.valid_dtslicers = (self.dtslicer1, self.dtslicer2, self.dtslicer3)
-        self.invalid_dtslicers  = (self.dtslicer4,)
+        self.invalid_dtslicers = (self.dtslicer4,)
 
     def test_from_string(self):
         """Check string parsing."""
