@@ -22,14 +22,13 @@ class ObjectCollection(object):
     objects to/from the collection.
     
     This class may be useful for nested data structures (a collection may
-    contain itself other collections)s.
+    contain itself other collections).
     
     Parameters
     ----------
-    ref_class : class
-        All list items must be objects of this class.
     objects : iterable
-        Objects to append to the list.
+        Objects to append to the list. All items in the iterable must be
+        objects of a same class.
     callbacks : (callable or None, callable or None)
         Functions called when an object is (added to, removed from) the
         collection. Each function must accepts one argument that must be any
@@ -47,17 +46,19 @@ class ObjectCollection(object):
     An object cannot be inserted more than once in a collection.
     """
 
-    def __init__(self, ref_class, objects=[], callbacks=(None, None),
+    def __init__(self, objects=[], callbacks=(None, None),
                  read_only=False):
 
-        self._ref_class = ref_class
+        self._ref_class = None
         self._list = []
         self._callback_add, self._callback_remove = callbacks
         self._ref_collection = None
-        self._read_only = read_only
+        self._read_only = False
 
         for obj in objects:
             self.add(obj)
+
+        self._read_only = read_only
 
     @property
     def ref_collection(self):
@@ -78,7 +79,7 @@ class ObjectCollection(object):
         and set the correct reference collection.
         """
         cls = self.__class__
-        selection = cls(self._ref_class, objects=sel_objects)
+        selection = cls(objects=sel_objects)
         if self._ref_collection is None:
             selection._ref_collection = self
         else:
@@ -120,6 +121,8 @@ class ObjectCollection(object):
         ValueError
             If `obj` is already in the collection.
         """
+        if self._ref_class is None:
+            self._ref_class = obj.__class__
         self._check_read_only()
         if not isinstance(obj, self._ref_class):
             raise TypeError("Cannot add object of class '{0}' in a "
@@ -224,8 +227,8 @@ class ObjectCollection(object):
             
         Returns
         -------
-        A new collection (:class:`ObjectLict` instance) containing the selected
-        objects.
+        A new collection (:class:`ObjectCollection` instance) containing the
+        selected objects.
         
         Notes
         -----
@@ -255,7 +258,7 @@ class ObjectCollection(object):
         
         Returns
         -------
-        A new collection (:class:`ObjectLict` instance) containing
+        A new collection (:class:`ObjectCollection` instance) containing
         the selected object.
         
         Raises
