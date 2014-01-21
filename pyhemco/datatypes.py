@@ -33,9 +33,13 @@ class ObjectCollection(object):
         Functions called when an object is (added to, removed from) the
         collection. Each function must accepts one argument that must be any
         instance of class `ref_class`.
-    read_only = bool
+    read_only : bool
         If True, collection is read-only (will raise an exception when calling
         :meth:`add`, :meth:`remove` or :meth:`duplicate` methods).
+    ref_class : class or None
+        Specify explicitly the class of expected items in the collection
+        (if None, the class will be determined from the first item found in
+        `objects`).
     
     Notes
     -----
@@ -47,9 +51,9 @@ class ObjectCollection(object):
     """
 
     def __init__(self, objects=[], callbacks=(None, None),
-                 read_only=False):
+                 read_only=False, ref_class=None):
 
-        self._ref_class = None
+        self._ref_class = ref_class
         self._list = []
         self._callback_add, self._callback_remove = callbacks
         self._ref_collection = None
