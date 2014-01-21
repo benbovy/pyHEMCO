@@ -146,21 +146,27 @@ def base_emission_field(gc_field, name, timestamp, species, category,
         (a copy of) `gc_field` with a new attribute 'emission_base'.
     
     """
+    sftest = all([bool(sf.attributes.get('emission_scale_factor', False))
+                  for sf in scale_factors])
+    if not sftest:
+        # TODO: raise custom exception like InvalidFieldError
+        raise ValueError("missing 'emission_scale_factor' attribute")
+
     e_attr = {'name': str(name),
               'timestamp': str(strp_datetimeslicer(timestamp)),
               'species': species,
               'category': int(category),
               'hierarchy': int(hierarchy),
               'extension': extension,
-              'scale_factors': scale_factors,
-              'id': field_id}
+              'scale_factors': scale_factors}
 
     e_field = _add_emission_attr(gc_field, name, BASE_EM_ATTR_NAME,
                                  e_attr, copy)
     return e_field
 
 
-def scale_factor(gc_field, name, timestamp, operator='mul', copy=False):
+def scale_factor(gc_field, name, timestamp, operator='mul', copy=False,
+                 fid=None):
     """
     Create an emission scale factor from an existing GEOS-Chem field.
     
@@ -177,6 +183,9 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False):
         Mathematical operator (multiply, divide or square)
     copy : bool
         Copy `gc_field` (True) or modifying it in place.
+    fid : int or None
+        Specify manually an ID to identify the scale factor (if None, an ID
+        will be further set automatically).
     
     Returns
     -------
@@ -184,9 +193,13 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False):
         (a copy of) `gc_field` with a new attribute 'emission_scale_factor'.
     
     """
+    if fid is not None:
+        fid = int(fid)
+
     sf_attr = {'name': str(name),
                'timestamp': str(strp_datetimeslicer(timestamp)),
-               'operator': operator}
+               'operator': operator,
+               'fid': fid}
 
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
@@ -194,7 +207,7 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False):
 
 
 def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
-         copy=False):
+         copy=False, fid=None):
     """
     Create an emission mask from an existing GEOS-Chem field.
     
@@ -215,6 +228,9 @@ def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
         Invert the mask field (1-S).
     copy : bool
         Modify `gc_field` in place (False, default), or return a new copy.
+    fid : int or None
+        Specify manually an ID to identify the mask (if None, an ID
+        will be further set automatically).
     
     Returns
     -------
@@ -222,11 +238,16 @@ def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
         (a copy of) `gc_field` with a new attribute 'emission_scale_factor'.
     
     """
+    if fid is not None:
+        fid = int(fid)
+
     sf_attr = {'name': str(name),
                'timestamp': str(strp_datetimeslicer(timestamp)),
                'operator': 'mul',
                'mask_window': mask_window,
-               'mirror': bool(mirror)}
+               'mirror': bool(mirror),
+               'fid': fid}
+
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
     return e_field
@@ -242,22 +263,25 @@ class EmissionExt(object):
         Descriptive extension name.
     enabled : bool
         True if the extension is enabled
+    eid : int or None
+        Specify manually an ID to identify the extension.
     """
 
-    def __init__(self, name, enabled=True):
-        self._number = None      # not public, defined while loading/saving
-        # emission settings
+    def __init__(self, name, enabled=True, eid=None):
+        if eid is not None:
+            eid = int(eid)
+        self.eid = eid
         self.name = str(name)
         self.enabled = bool(enabled)
 
     def __str__(self):
         return "GC-Emission extension '{0}' ({1})" \
-            .format(self.name, self._number or 'no-id')
+            .format(self.name, str(self.eid or 'no-id'))
 
     def __repr__(self):
         return '<{0}: {1} ({2})>'.format(self.__class__.__name__,
                                          self.name,
-                                         self._number or 'no-id')
+                                         str(self.eid or 'no-id'))
 
 
 class Emissions(object):
@@ -283,11 +307,32 @@ class Emissions(object):
 
     def __init__(self, extensions=[], base_emission_fields=[], description="",
                  **kwargs):
-        self._extensions = ObjectCollection(EmissionExt, extensions)
-        self._base_emission_fields = ObjectCollection(GCField,
-                                                      base_emission_fields)
+        self._extensions = ObjectCollection(extensions,
+                                            ref_class=EmissionExt)
+
+        bftest = all([bool(bf.attributes.get('emission_base', False))
+                      for bf in base_emission_fields])
+        if not bftest:
+            # TODO: raise custom exception like InvalidFieldError
+            raise ValueError("missing 'emission_base' attribute")
+
+        self._base_emission_fields = ObjectCollection(base_emission_fields,
+                                                      ref_class=GCField)
         self.description = str(description)
         self.settings = kwargs
+
+    def _update_ids(self):
+        """
+        Update scale factors and extensions identifiants.
+
+        Add new identifiants if not already set, solve conflicts if needed.
+        """
+        # TODO: (not yet implemented)
+        # get a list of new available ids
+        current_fids = set([sf.attributes[SF_ATTR_NAME].get('fid')
+                            for sf in self.scale_factors])
+        fullrange_fids = set(range(min(current_fids), max(current_fids) + 1))
+        free_fids = sorted(fullrange_fids - current_fids)
 
     @property
     def extensions(self):
@@ -296,18 +341,20 @@ class Emissions(object):
         
         See Also
         --------
-        :class:`utils.data_struct.ObjectCollection`
+        :class:`datatypes.ObjectCollection`
         """
         return self._extensions
 
     @property
     def base_emission_fields(self):
         """
-        Base emission fields (collection of :class:`BaseEmissionField` objects).
+        Base emission fields (collection of :class:`GCField` objects with a
+        specific 'emission_base' extra attribute).
         
         See Also
         --------
-        :class:`utils.data_struct.ObjectCollection`
+        :class:`datatypes.ObjectCollection`
+        :func:`base_emission_field`
         """
         return self._base_emission_fields
 
@@ -324,9 +371,10 @@ class Emissions(object):
         scale_factors = []
         for field in self.base_emission_fields:
             e_attr = field.attributes['emission_base']
-            e_sf_list = e_attr.get('emission_scale_factors', [])
+            e_sf_list = e_attr.get('scale_factors', [])
             scale_factors.extend(e_sf_list)
-        return ObjectCollection(GCField, set(scale_factors), read_only=True)
+        return ObjectCollection(set(scale_factors), read_only=True,
+                                ref_class=GCField)
 
     @classmethod
     def load(cls, filename):
@@ -358,19 +406,8 @@ class Emissions(object):
         Save emission settings to an HEMCO-formatted input file given by
         `filename`.
         """
-        # reset ids of scale factors
-        inc = 0
-        for sf in self.scale_factors:
-            sf._id = inc
-            inc += 1
-
-        # reset extension numbers
-        inc = 101
-        for ext in self.extensions:
-            ext._number = inc
-            inc += 1
-
-            # TODO: (not yet implemented)
+        # TODO: (not yet implemented)
+        self._update_ids()
 
     def compute_emissions(self, time, grid):
         """
