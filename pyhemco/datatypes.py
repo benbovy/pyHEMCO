@@ -143,6 +143,13 @@ class ObjectCollection(object):
         if self._callback_add is not None:
             self._callback_add(obj)
 
+    def extend(self, objs):
+        """
+        add to the collection objects from iterable `objs`.
+        """
+        for obj in objs:
+            self.add(obj)
+
     def replace(self, new_obj):
         """
         Replace a given, selected object with
