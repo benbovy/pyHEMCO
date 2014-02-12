@@ -50,7 +50,7 @@ class ObjectCollection(object):
     An object cannot be inserted more than once in a collection.
     """
 
-    def __init__(self, objects=[], callbacks=(None, None),
+    def __init__(self, objects, callbacks=(None, None),
                  read_only=False, ref_class=None):
 
         self._ref_class = ref_class
