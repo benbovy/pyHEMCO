@@ -24,7 +24,7 @@ from pyhemco.datatypes import ObjectCollection
 
 
 BUILTIN_SETTINGS_PATH = 'path/to/default/settings/files'
-BASE_EM_ATTR_NAME = 'emission_base'
+BEF_ATTR_NAME = 'emission_base'
 SF_ATTR_NAME = 'emission_scale_factor'
 
 
@@ -42,8 +42,8 @@ class GCField(object):
     ----------
     name : string
         Field descriptive name
-    standard_name : string
-        Field (variable) standard name.
+    var_name : string
+        Field (variable) name.
     ndim : int
         Data (number of) dimensions 
     unit : string
@@ -55,10 +55,12 @@ class GCField(object):
     
     """
 
-    def __init__(self, name, standard_name='', ndim=0, unit='',
-                 filename='', data=[], **kwargs):
+    def __init__(self, name, var_name='', ndim=0, unit='',
+                 filename='', data=None, **kwargs):
+        data = data or []
+
         self.name = str(name)
-        self.standard_name = str(standard_name)
+        self.var_name = str(var_name)
         self.ndim = int(ndim)
         self.unit = str(unit)
         self.filename = filename
@@ -75,30 +77,30 @@ class GCField(object):
             return copy(self)
 
     def __str__(self):
-        return 'GCField {}'.format(self.name or self.standard_name)
+        return 'GCField {}'.format(self.name or self.var_name)
 
     def __repr__(self):
         return '<{0}: {1}>'.format(self.__class__.__name__,
-                                   self.name or self.standard_name)
+                                   self.name or self.var_name)
 
 
 #-----------------------------------------------------------------------------
 # HEMCO API classes and functions
 #-----------------------------------------------------------------------------
 
-def _add_emission_attr(gc_field, name, attr_name, attr_val, copy):
+def _add_emission_attr(gc_field, name, attr_name, attr_val, copy_field):
     """
     Adds an emission-specific attribute to `gc_field` (raises an error if
     such an attribute is already set for `gc_field`).
     """
-    e_attrs = (BASE_EM_ATTR_NAME, SF_ATTR_NAME)
+    e_attrs = (BEF_ATTR_NAME, SF_ATTR_NAME)
     f_attrs = gc_field.attributes.keys()
     if any(a in f_attrs for a in e_attrs):
         # TODO: raise custom Exception (for example 'InvalidFieldException')
         raise ValueError("gc_field has already an emission attribute")
 
-    if copy:
-        e_field = gc_field.copy()
+    if copy_field:
+        e_field = gc_field.copy(copy_data=True)
         e_field.name = str(name)
     else:
         e_field = gc_field
@@ -107,8 +109,40 @@ def _add_emission_attr(gc_field, name, attr_name, attr_val, copy):
     return e_field
 
 
+def is_base_emission_field(gc_field, critical=False):
+    """
+    Check whether `gc_field` (a :class:`GCField` object) has base emission
+    field metadata.
+
+    Will raise an error if `critical` is True and no base emission attribute
+    is found.
+    """
+    etest = bool(gc_field.attributes.get(BEF_ATTR_NAME, False))
+    if critical and not etest:
+        # TODO: raise custom exception like InvalidFieldError
+        raise ValueError("missing '{}' attribute".format(BEF_ATTR_NAME))
+    else:
+        return etest
+
+
+def is_scale_factor(gc_field, critical=False):
+    """
+    Check whether `gc_field` (a :class:`GCField` object) has scale factor or
+    mask metadata.
+
+    Will raise an error if `critical` is True and no scale factor attribute
+    is found.
+    """
+    etest = bool(gc_field.attributes.get(SF_ATTR_NAME, False))
+    if critical and not etest:
+        # TODO: raise custom exception like InvalidFieldError
+        raise ValueError("missing '{}' attribute".format(SF_ATTR_NAME))
+    else:
+        return etest
+
+
 def base_emission_field(gc_field, name, timestamp, species, category,
-                        hierarchy, extension=None, scale_factors=[],
+                        hierarchy, extension=None, scale_factors=None,
                         copy=False):
     """
     Create a base emission field from an existing GEOS-Chem field.
@@ -135,22 +169,24 @@ def base_emission_field(gc_field, name, timestamp, species, category,
         HEMCO extension to use with this emission field. Set None if the field
         is to be used by the HCMO core.
     scale_factors : list :class:`GCField` objects
-        Scale factors to be applied to the base emission field. Each field in
-        the list must have a 'emission_scale_factor' attribute.
+        Scale factors and masks to be applied to the base emission field.
+        Each field in the list must have a 'emission_scale_factor' attribute.
     copy : bool
         Copy `gc_field` (True) or modifying it in place.
     
     Returns
     -------
     :class:`GCField` object
-        (a copy of) `gc_field` with a new attribute 'emission_base'.
+        (a copy of) `gc_field` with a new field attribute 'emission_base'.
+        An extra class attribute `emission_scale_factors` is also added
+        for quick access to scale factors assigned to this field.
     
     """
-    sftest = all([bool(sf.attributes.get('emission_scale_factor', False))
-                  for sf in scale_factors])
-    if not sftest:
-        # TODO: raise custom exception like InvalidFieldError
-        raise ValueError("missing 'emission_scale_factor' attribute")
+    scale_factors = scale_factors or []
+
+    clb_add = lambda gcf: is_scale_factor(gcf, critical=True)
+    scale_factors = ObjectCollection(scale_factors, ref_class=GCField,
+                                     callbacks=(clb_add, None))
 
     e_attr = {'name': str(name),
               'timestamp': str(strp_datetimeslicer(timestamp)),
@@ -160,12 +196,17 @@ def base_emission_field(gc_field, name, timestamp, species, category,
               'extension': extension,
               'scale_factors': scale_factors}
 
-    e_field = _add_emission_attr(gc_field, name, BASE_EM_ATTR_NAME,
+    e_field = _add_emission_attr(gc_field, name, BEF_ATTR_NAME,
                                  e_attr, copy)
-    return e_field
+
+    # shortcut for scale factors
+    e_field.emission_scale_factors = scale_factors
+
+    if copy:
+        return e_field
 
 
-def scale_factor(gc_field, name, timestamp, operator='mul', copy=False,
+def scale_factor(gc_field, name, timestamp, operator='*', copy=False,
                  fid=None):
     """
     Create an emission scale factor from an existing GEOS-Chem field.
@@ -179,7 +220,7 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False,
     timestamp : string
         time stamp of interest (YYYY/MM/DD/HH).
         See :func:`timetools.strptimeslicer`.
-    operator : {'mul', 'div', 'sqr'}
+    operator : {'*', '/', '**2'}
         Mathematical operator (multiply, divide or square)
     copy : bool
         Copy `gc_field` (True) or modifying it in place.
@@ -203,7 +244,8 @@ def scale_factor(gc_field, name, timestamp, operator='mul', copy=False,
 
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
-    return e_field
+    if copy:
+        return e_field
 
 
 def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
@@ -250,7 +292,8 @@ def mask(gc_field, name, timestamp, mask_window=None, mirror=False,
 
     e_field = _add_emission_attr(gc_field, name, SF_ATTR_NAME,
                                  sf_attr, copy)
-    return e_field
+    if copy:
+        return e_field
 
 
 class EmissionExt(object):
@@ -296,54 +339,22 @@ class Emissions(object):
         Base emission fields.
     description : string
         A short description of emission settings.
-    
-    Other Parameters
-    ----------------
-    verbose : bool
-        Run HEMCO in verbose mode (default: False).
-    **kwargs
-        Specify any additional settings by name=value.
+    extra_settings : dict or None
+        Additional settings of HEMCO.
+
     """
 
-    def __init__(self, extensions=[], base_emission_fields=[], description="",
-                 **kwargs):
-        self._extensions = ObjectCollection(extensions,
-                                            ref_class=EmissionExt)
+    def __init__(self, base_emission_fields, description="",
+                 extra_settings=None):
+        extra_settings = extra_settings or {}
 
-        bftest = all([bool(bf.attributes.get('emission_base', False))
-                      for bf in base_emission_fields])
-        if not bftest:
-            # TODO: raise custom exception like InvalidFieldError
-            raise ValueError("missing 'emission_base' attribute")
+        clb_add = lambda gcf: is_base_emission_field(gcf, critical=True)
 
         self._base_emission_fields = ObjectCollection(base_emission_fields,
-                                                      ref_class=GCField)
+                                                      ref_class=GCField,
+                                                      callbacks=(clb_add, None))
         self.description = str(description)
-        self.settings = kwargs
-
-    def _update_ids(self):
-        """
-        Update scale factors and extensions identifiants.
-
-        Add new identifiants if not already set, solve conflicts if needed.
-        """
-        # TODO: (not yet implemented)
-        # get a list of new available ids
-        current_fids = set([sf.attributes[SF_ATTR_NAME].get('fid')
-                            for sf in self.scale_factors])
-        fullrange_fids = set(range(min(current_fids), max(current_fids) + 1))
-        free_fids = sorted(fullrange_fids - current_fids)
-
-    @property
-    def extensions(self):
-        """
-        HEMCO extensions (collection of :class:`EmissionExt` objects).
-        
-        See Also
-        --------
-        :class:`datatypes.ObjectCollection`
-        """
-        return self._extensions
+        self.extra_settings = dict(extra_settings)
 
     @property
     def base_emission_fields(self):
@@ -364,17 +375,91 @@ class Emissions(object):
         All scale factors (and masks) that are attached to the base emission
         fields.
         
-        It is a read-only collection of :class:`GCField` objects (if a scale
+        Return a collection of :class:`GCField` objects (if a scale
         factor is attached to several emission fields, it appears only once
-        in the collection).
+        in the list).
         """
         scale_factors = []
         for field in self.base_emission_fields:
             e_attr = field.attributes['emission_base']
             e_sf_list = e_attr.get('scale_factors', [])
             scale_factors.extend(e_sf_list)
-        return ObjectCollection(set(scale_factors), read_only=True,
-                                ref_class=GCField)
+        return ObjectCollection(set(scale_factors), ref_class=GCField,
+                                read_only=True)
+
+    @property
+    def extensions(self):
+        """
+        HEMCO extensions (list of :class:`EmissionExt` objects assigned to
+        base emission fields).
+
+        Return a collection of :class:`EmissionExt` objects (if an extension
+        is attached to several emission fields, it appears only once
+        in the list). HEMCO Core is not included in the list.
+        """
+        all_exts = [bef.attributes[BEF_ATTR_NAME]['extension']
+                    for bef in self.base_emission_fields]
+        exts = [e for e in all_exts if e is not None]
+        return ObjectCollection(set(exts), ref_class=EmissionExt,
+                                read_only=True)
+
+    def check_id(self):
+        """
+        Check scale factors and extensions identifiants
+        (missing ids or duplicates).
+        """
+        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
+                for sf in self.scale_factors]
+        if None in fids or len(set(fids)) != len(fids):
+            # TODO: raise custom exception
+            raise ValueError("Missing or duplicate scale factor ID(s)")
+
+        eids = [ext.eid for ext in self.extensions]
+        if None in eids or len(set(eids)) != len(eids):
+            # TODO: raise custom exception
+            raise ValueError("Missing or duplicate extension ID(s)")
+
+    def resolve_id(self):
+        """
+        Automatically resolve scale factors and extensions ID conficts
+        (add new ID(s) if not already set, update ID(s) if needed).
+        """
+        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
+                for sf in self.scale_factors]
+        min_fid = min(i for i in fids if i is not None)
+        range_fids = range(min_fid, max(fids) + len(fids) + 1)
+        duplicate_fids = set([fid for fid in fids if fids.count(fid) > 1])
+        available_fids = sorted(set(range_fids) - set(fids))
+
+        inc = 0
+        first_dups = []
+        for sf in self.scale_factors:
+            fid = sf.attributes[SF_ATTR_NAME].get('fid')
+            if fid not in duplicate_fids and fid is not None:
+                continue
+            if fid not in first_dups and fid is not None:
+                first_dups.append(fid)
+                continue
+            sf.attributes[SF_ATTR_NAME]['fid'] = available_fids[inc]
+            inc += 1
+
+        eids = [ext.eid for ext in self.extensions]
+        min_eid = min(i for i in eids if i is not None)
+        range_eids = range(min_eid, max(eids) + len(eids) + 1)
+        duplicate_eids = set([eid for eid in eids if eids.count(eid) > 1])
+        available_eids = sorted(set(range_eids) - set(eids))
+
+        inc = 0
+        first_dups = []
+        for ext in self.extensions:
+            eid = ext.eid
+            if eid not in duplicate_eids and eid is not None:
+                continue
+            if eid not in first_dups and eid is not None:
+                first_dups.append(eid)
+                continue
+            ext.eid = available_eids[inc]
+            inc += 1
 
     @classmethod
     def load(cls, filename):
@@ -401,13 +486,16 @@ class Emissions(object):
         settings_file = os.path.join(BUILTIN_SETTINGS_PATH, settings)
         return cls.load(settings_file)
 
-    def save(self, filename):
+    def save(self, filename, resolve_id=False):
         """
         Save emission settings to an HEMCO-formatted input file given by
         `filename`.
         """
         # TODO: (not yet implemented)
-        self._update_ids()
+        if resolve_id:
+            self.resolve_id()
+        else:
+            self.check_id()
 
     def compute_emissions(self, time, grid):
         """
