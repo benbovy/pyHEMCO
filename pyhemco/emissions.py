@@ -15,12 +15,18 @@ Not yet operational.
 """
 
 import os
+import sys
 from copy import copy, deepcopy
 
 import numpy as np
 
-from pyhemco.timetools import strp_datetimeslicer
-from pyhemco.datatypes import ObjectCollection
+sys.path.append('/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/pyhemco/')
+
+from timetools import strp_datetimeslicer
+from datatypes import ObjectCollection
+
+#from pyhemco.timetools import strp_datetimeslicer
+#from pyhemco.datatypes import ObjectCollection
 
 
 BUILTIN_SETTINGS_PATH = 'path/to/default/settings/files'
@@ -108,7 +114,6 @@ def _add_emission_attr(gc_field, name, attr_name, attr_val, copy_field):
 
     return e_field
 
-
 def is_base_emission_field(gc_field, critical=False):
     """
     Check whether `gc_field` (a :class:`GCField` object) has base emission
@@ -144,6 +149,7 @@ def is_scale_factor(gc_field, critical=False):
 def base_emission_field(gc_field, name, timestamp, species, category,
                         hierarchy, extension=None, scale_factors=None,
                         copy=False):
+
     """
     Create a base emission field from an existing GEOS-Chem field.
     
