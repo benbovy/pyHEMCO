@@ -20,14 +20,11 @@ from copy import copy, deepcopy
 
 import numpy as np
 
-sys.path.append('/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/pyhemco/')
+sys.path.append('/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO')
 
-from timetools import strp_datetimeslicer
-from datatypes import ObjectCollection
-
-#from pyhemco.timetools import strp_datetimeslicer
-#from pyhemco.datatypes import ObjectCollection
-
+from pyhemco.timetools import strp_datetimeslicer
+from pyhemco.datatypes import ObjectCollection
+from pyhemco.io import read_config_file, write_config_file
 
 BUILTIN_SETTINGS_PATH = 'path/to/default/settings/files'
 BEF_ATTR_NAME = 'emission_base'
@@ -64,6 +61,13 @@ class GCField(object):
     def __init__(self, name, var_name='', ndim=0, unit='',
                  filename='', data=None, **kwargs):
         data = data or []
+        if isinstance(ndim,str):
+            if ndim=='xy':
+                ndim=2
+            elif ndim=='xyz':
+                ndim=3
+            else:
+                raise ValueError("unsupported ndim character:",ndim)
 
         self.name = str(name)
         self.var_name = str(var_name)
@@ -81,7 +85,24 @@ class GCField(object):
             return deepcopy(self)
         else:
             return copy(self)
+        
+    def is_mask(self):
+        """Returns True if this is a mask scale factor, False otherwise."""
+        ismask = False
+        
+        if SF_ATTR_NAME in self.attributes.keys():
+            ismask = 'mask_window' in self.attributes[SF_ATTR_NAME].keys()
+            
+        return ismask
 
+    def is_extbase(self):
+        """Returns True if this is a base field belonging to an extension, 
+        False otherwise."""
+        isextbase = False
+        if BEF_ATTR_NAME in self.attributes.keys():
+            isextbase = self.attributes[BEF_ATTR_NAME]['extension'] is not None  
+        return isextbase
+        
     def __str__(self):
         return 'GCField {}'.format(self.name or self.var_name)
 
@@ -144,7 +165,7 @@ def is_scale_factor(gc_field, critical=False):
         raise ValueError("missing '{}' attribute".format(SF_ATTR_NAME))
     else:
         return etest
-
+        
 
 def base_emission_field(gc_field, name, timestamp, species, category,
                         hierarchy, extension=None, scale_factors=None,
@@ -188,7 +209,7 @@ def base_emission_field(gc_field, name, timestamp, species, category,
         for quick access to scale factors assigned to this field.
     
     """
-    scale_factors = scale_factors or []
+    scale_factors    = scale_factors or []
 
     clb_add = lambda gcf: is_scale_factor(gcf, critical=True)
     scale_factors = ObjectCollection(scale_factors, ref_class=GCField,
@@ -409,13 +430,20 @@ class Emissions(object):
         return ObjectCollection(set(exts), ref_class=EmissionExt,
                                 read_only=True)
 
+    def get_scalIDs(self):
+        """
+        Return a list of all currently defined scale factor IDs.
+        """
+        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
+                for sf in self.scale_factors]
+        return fids
+
     def check_id(self):
         """
         Check scale factors and extensions identifiants
         (missing ids or duplicates).
         """
-        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
-                for sf in self.scale_factors]
+        fids = self.get_scalIDs()
         if None in fids or len(set(fids)) != len(fids):
             # TODO: raise custom exception
             raise ValueError("Missing or duplicate scale factor ID(s)")
@@ -430,8 +458,7 @@ class Emissions(object):
         Automatically resolve scale factors and extensions ID conficts
         (add new ID(s) if not already set, update ID(s) if needed).
         """
-        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
-                for sf in self.scale_factors]
+        fids = self.get_scalIDs()
         min_fid = min(i for i in fids if i is not None)
         range_fids = range(min_fid, max(fids) + len(fids) + 1)
         duplicate_fids = set([fid for fid in fids if fids.count(fid) > 1])
@@ -476,9 +503,9 @@ class Emissions(object):
         See Also
         --------
         :func:`load_emissions_file`
-        """
-        # TODO: (not yet implemented)
-        pass
+        """        
+        cls = read_config_file( filename )
+        return cls
 
     @classmethod
     def builtin(cls, settings):
@@ -502,6 +529,8 @@ class Emissions(object):
             self.resolve_id()
         else:
             self.check_id()
+            
+        write_config_file ( self, filename )
 
     def compute_emissions(self, time, grid):
         """
@@ -520,7 +549,6 @@ class Emissions(object):
 
     def __repr__(self):
         return repr(self)
-
 
 def load_emissions_file(filename):
     """
