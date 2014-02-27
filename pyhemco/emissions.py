@@ -352,7 +352,7 @@ class Emissions(object):
 
         self._base_emission_fields = ObjectCollection(base_emission_fields,
                                                       ref_class=GCField,
-                                                      callbacks=(clb_add, None))
+                                                      fpost=(clb_add, None))
         self.description = str(description)
         self.extra_settings = dict(extra_settings)
 
