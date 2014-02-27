@@ -184,9 +184,9 @@ def base_emission_field(gc_field, name, timestamp, species, category,
     """
     scale_factors = scale_factors or []
 
-    clb_add = lambda gcf: is_scale_factor(gcf, critical=True)
+    fpost_add = lambda gcf: is_scale_factor(gcf, critical=True)
     scale_factors = ObjectCollection(scale_factors, ref_class=GCField,
-                                     callbacks=(clb_add, None))
+                                     fpost=(fpost_add, None))
 
     e_attr = {'name': str(name),
               'timestamp': str(strp_datetimeslicer(timestamp)),
