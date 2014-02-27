@@ -32,7 +32,8 @@ class ObjectCollection(object):
     fpre : (callable or None, callable or None)
         Functions called before an object is (added to, removed from) the
         collection. Each function must accepts one argument that must be any
-        instance of class `ref_class`.
+        instance of class `ref_class`, and must return True (add/remove
+        object) or False (don't add/remove object).
     fpost : (callable or None, callable or None)
         Functions called after an object is (added to, removed from) the
         collection. Each function must accepts one argument that must be any
@@ -132,7 +133,9 @@ class ObjectCollection(object):
             If `obj` is already in the collection.
         """
         if self._fpre_add is not None:
-            self._fpre_add(obj)
+            proceed = self._fpre_add(obj)
+            if not proceed:
+                return
 
         if self._ref_class is None:
             self._ref_class = obj.__class__
@@ -190,7 +193,9 @@ class ObjectCollection(object):
         ref = self._get_ref_collection_or_error()
         for obj in self._list:
             if ref._fpre_remove is not None:
-                ref._fpre_remove(obj)
+                proceed = ref._fpre_remove(obj)
+                if not proceed:
+                    continue
             ref._list.remove(obj)
             if ref._fpost_remove is not None:
                 ref._fpost_remove(obj)
