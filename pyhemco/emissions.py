@@ -184,9 +184,9 @@ def base_emission_field(gc_field, name, timestamp, species, category,
     """
     scale_factors = scale_factors or []
 
-    clb_add = lambda gcf: is_scale_factor(gcf, critical=True)
+    fpost_add = lambda gcf: is_scale_factor(gcf, critical=True)
     scale_factors = ObjectCollection(scale_factors, ref_class=GCField,
-                                     callbacks=(clb_add, None))
+                                     fpost=(fpost_add, None))
 
     e_attr = {'name': str(name),
               'timestamp': str(strp_datetimeslicer(timestamp)),
@@ -348,13 +348,69 @@ class Emissions(object):
                  extra_settings=None):
         extra_settings = extra_settings or {}
 
-        clb_add = lambda gcf: is_base_emission_field(gcf, critical=True)
+        self._extensions = ObjectCollection(
+            [],
+            ref_class=EmissionExt,
+            fpre=(self._fpre_add_ext, self._fpre_remove_ext),
+            fpost=(None, None))
 
-        self._base_emission_fields = ObjectCollection(base_emission_fields,
-                                                      ref_class=GCField,
-                                                      fpost=(clb_add, None))
+        self._base_emission_fields = ObjectCollection(
+            base_emission_fields,
+            ref_class=GCField,
+            fpre=(self._fpre_add_bef, None),
+            fpost=(self._fpost_add_bef, None))
+
         self.description = str(description)
         self.extra_settings = dict(extra_settings)
+
+    def _fpre_add_bef(self, gcfield):
+        """
+        Before adding a gcfield as a base emission field, check the gcfield
+        attributes.
+        """
+        return is_base_emission_field(gcfield, critical=True)
+
+    def _fpost_add_bef(self, bef):
+        """
+        After added a base emission field, add its assigned extension to
+        the emission setup (if needed).
+        """
+        bef_ext = bef[BEF_ATTR_NAME]['extension']
+        if bef_ext not in self._extensions:
+            self._extensions.add(bef_ext)
+
+    # def _fpost_remove_bef(self, bef):
+    #     """
+    #     After removed a base emission field, (eventually) remove its assigned
+    #     extension from the emission setup.
+    #     """
+    #     bef_ext = lambda ext: ext == bef[BEF_ATTR_NAME]['extension']
+    #     self._extensions.get(bef_ext).remove()
+
+    def _fpre_add_ext(self, ext):
+        """
+        Check if the extension has been already added to the emission setup.
+        """
+        try:
+            comp_ext = self._extensions.get_object(name=ext.name)
+            if comp_ext != ext:
+                raise ValueError("found the same {} extension with other "
+                                 "settings".format(ext.name))
+            else:
+                return False
+        except ValueError:
+            return True
+
+    def _fpre_remove_ext(self, ext):
+        """
+        Cannot remove an extension which involves at least one base emission
+        field.
+        """
+        bef_exts = [bef[BEF_ATTR_NAME]['extension']
+                    for bef in self._base_emission_fields]
+        if ext in bef_exts:
+            raise ValueError("Can not remove an extension that is referenced "
+                             "by at least one emission field")
 
     @property
     def base_emission_fields(self):
@@ -390,18 +446,13 @@ class Emissions(object):
     @property
     def extensions(self):
         """
-        HEMCO extensions (list of :class:`EmissionExt` objects assigned to
-        base emission fields).
+        HEMCO extensions (list of :class:`EmissionExt` objects).
 
         Return a collection of :class:`EmissionExt` objects (if an extension
         is attached to several emission fields, it appears only once
         in the list). HEMCO Core is not included in the list.
         """
-        all_exts = [bef.attributes[BEF_ATTR_NAME]['extension']
-                    for bef in self.base_emission_fields]
-        exts = [e for e in all_exts if e is not None]
-        return ObjectCollection(set(exts), ref_class=EmissionExt,
-                                read_only=True)
+        return self._extensions
 
     def check_id(self):
         """
