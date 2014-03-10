@@ -20,7 +20,7 @@ from copy import copy, deepcopy
 
 import numpy as np
 
-sys.path.append('/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO')
+sys.path.append('path/to/pyhemco')
 
 from pyhemco.timetools import strp_datetimeslicer
 from pyhemco.datatypes import ObjectCollection

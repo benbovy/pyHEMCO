@@ -11,7 +11,7 @@ Several input/output writing routines for pyHEMCO.
 """
 
 import sys
-sys.path.append('/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO')
+sys.path.append('path/to/pyhemco')
 
 import pyhemco
 
