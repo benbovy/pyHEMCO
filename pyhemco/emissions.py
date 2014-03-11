@@ -17,10 +17,7 @@ Not yet operational.
 import os
 import sys
 from copy import copy, deepcopy
-
 import numpy as np
-
-sys.path.append('path/to/pyhemco')
 
 from pyhemco.timetools import strp_datetimeslicer
 from pyhemco.datatypes import ObjectCollection
@@ -335,14 +332,17 @@ class EmissionExt(object):
         True if the extension is enabled
     eid : int or None
         Specify manually an ID to identify the extension.
+    species: string list
+        List of emitted species
     """
 
-    def __init__(self, name, enabled=True, eid=None):
+    def __init__(self, name, enabled=True, eid=None, species=[]):
         if eid is not None:
             eid = int(eid)
         self.eid = eid
         self.name = str(name)
         self.enabled = bool(enabled)
+        self.species = species
 
     def __str__(self):
         return "GC-Emission extension '{0}' ({1})" \
@@ -352,7 +352,6 @@ class EmissionExt(object):
         return '<{0}: {1} ({2})>'.format(self.__class__.__name__,
                                          self.name,
                                          str(self.eid or 'no-id'))
-
 
 class Emissions(object):
     """

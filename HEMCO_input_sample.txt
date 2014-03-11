@@ -1,69 +1,21 @@
 ### HEMCO INPUT FILE ###
-#
-# ==================================================================================================
-# This file contains source file information of all emission fields used by the Harvard emissions 
-# component (HEMCO). 
-# Base emissions, scale factors and masks are listed in three separate sections. HEMCO settings and 
-# extensions are defined/activated at the end of the input file.
-#
-# Required for all fields: 
-# - Name: Descriptive field name.
-# - sourceFile: (netCDF) file name (incl. full path)
-# - sourceVar: file variable of interest
-# - sourceTime: time stamp of interest. Format is YYYY/MM/DD/HH. Ranges are allowed for temporally 
-#               changing data, e.g. 1990-2005/1/1/0 or 2002/1-12/1/0, in which case the time slices 
-#               closest to the simulation date is read and used (data will be updated automatically). 
-#               Use wildcard character (*) to read all time slices at once, e.g. 1990/1/1/*. This is 
-#               only recommended for quickly varying data, e.g. hourly data.
-# - srcDim: dimension of data: xy or xyz. This is mainly for compatibility with ESMF.
-# - srcUnit: unit of data. This is mainly for compatibility with ESMF.
-#
-# Additional fields required for base emissions:
-# - ExtNr: Extension number. Must match the extension number set in the extensions toggle section. 
-#          Use 0 for data to be used by HEMCO core.
-# - Species: Model name of emitted species. Emissions will only be calculated if Species matches one 
-#            of the model species names defined during initialization of HEMCO.
-# - ScalIDs: Scale factor IDs to be applied to the base field. Must match one of the ScalID entries 
-#            given in the scale factor/mask section. Separate multiple scale factors by forwardslash 
-#            (/). Use dash (-) if none.
-# - Cat: Emission category. Fields of the same category will be assembled based upon hierarchies. 
-# - Hier: Emission hierarchy. Higher hierarchy emissions will overwrite lower hierarchy emissions 
-#         (if same category).
-#
-# Additional fields required for scale factors:
-# - ScalID: Scale factor ID. To identify scale factor IDs assigend to base emissions
-# - Oper: Mathematical operator.
-#         1: Multiply, i.e. E = B * S.
-#         2: Square, i.e. E = B * S^2.
-#         -1: Divide, i.e. E = B * (1/S). Zeros will be ignored.
-#         3: Mirror, i.e. E = B * (1-S). Only applies to mask fields.
-# - Scalar: Instead of using gridded scale data from a (netCDF) file, a scalar value can be defined. 
-#           This value will be uniformly applied to each grid box (e.g. to divide lumped VOC 
-#           emissions into individual species). Leave all file information blank (-) if scalar value 
-#           shall be used. Scalars can be uniform in time (one entry), hourly scale factors (24 
-#           entries, separated by forward slash), day-of-week factor (7 entries), or monthly scale 
-#           factors (12 entries).
-#
-# Additional fields required for masks:
-# - Lon1/Lat1/Lon2/Lat2: Mask window. Give the approximate window of the mask field. Only used to 
-#                        determine whether or not a field is important for a given CPU. Lon1/Lat1 
-#                        denote the lower left corner, Lon2/Lat2 is the upper right corner.
-#
-# Settings:
-# - Verbose: Set to true to run HEMCO in verbose mode.
-#
-# Extensions switches:
-# This section steers which extensions shall be used and the files associated with them.
-# - ExtName: extension name
-# - on/off: Set to on to activate extension
-# - ExtNr: Extensions number. Determines the base emission fields accessible within an extension
-#          (and only in this extension!). Note that ExtNr 0 is reserved for HEMCO core!
-# ==================================================================================================
 
 ####################################################################################
-### BASE EMISSIONS 
+BEGIN SECTION SETTINGS
 ####################################################################################
+Logfile: HEMCO.log
+LogLun:  10
+Wildcard: *
+Separator: /
+Enforce unitless scale factor: true 
+Verbose: true
 
+#
+END SECTION SETTINGS 
+
+####################################################################################
+BEGIN SECTION BASE EMISSIONS 
+####################################################################################
 # ExtNr	Name sourceFile	sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier
 
 # --- GEIA ---
@@ -73,81 +25,83 @@
 0 LIANG_CHBR3  /path/to/data/emis/BROMINE/Bromocarb_Liang2010.nc CHBr3_emission  2000/1/1/0 xy kg/m2/s CHBr3  38 1 1
 0 LIANG_CH2BR2 /path/to/data/emis/BROMINE/Bromocarb_Liang2010.nc CH2Br2_emission 2000/1/1/0 xy kg/m2/s CH2Br2 38 1 1
 
+# --- GFED 3 emissions
+# ==> report here only emission factors in kg/kgDM or kgC/kgDM. Dry matter (DM) emissions in
+#     kgDM/m2/s are passed as scale factor!
+0 GFED3_NO_AGW  2.29e-3 - - xy kg/kgDM NO 121/128 30 1
+
 #
-# END OF BASE EMISSIONS 
+END SECTION BASE EMISSIONS 
 
 ####################################################################################
-### SCALE FACTORS 
+BEGIN SECTION SCALE FACTORS 
 ####################################################################################
-
-# ScalID Name sourceFile sourceVar sourceTime SrcDim SrcUnit Oper Scalar
+# ScalID Name sourceFile sourceVar sourceTime SrcDim SrcUnit Oper
 
 # --- annual scale factors ---
-1  TOTFUEL_THISYR /path/to/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc NOXscalar 1985-2008/1/1/0 xy unitless  1 -
-2  TOTFUEL_1985   /path/to/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc NOXscalar 1985/1/1/0      xy unitless -1 -
-3  TOTFUEL_2002   /path/to/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc NOXscalar 2002/1/1/0      xy unitless -1 -
+1  TOTFUEL_THISYR /home/ckeller/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc           NOXscalar 1985-2008/1/1/0 xy unitless  1
+2  TOTFUEL_1985   /home/ckeller/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc           NOXscalar 1985/1/1/0      xy unitless -1
+3  TOTFUEL_1985   /home/ckeller/data/emis/AnnualScalar/nc/NOx-AnnualScalar.geos.1x1.nc           NOXscalar 2002/1/1/0      xy unitless -1
 
 # --- day-of-week scale factors --- 
-20 GEIA_DOW_NOX - - - xy unitless 1 1.0706/1.0706/1.0706/1.0706/1.0706/0.863/0.784 
+20 GEIA_DOW_NOX 1.0706/1.0706/1.0706/1.0706/1.0706/0.863/0.784 - - xy unitless 1 
 
 # --- diurnal scale factors --- 
-25 EDGAR_TODNOX /path/to/data/emis/EDGAR/nc/dailyScal.nc NOXscale 2000/1/1/1-24 xy unitless 1 -
+25 EDGAR_TODNOX /home/ckeller/data/emis/EDGAR/nc/EDGAR_hourly_NOxScal.nc NOXscale 2000/1/1/* xy unitless 1
 
-# Seasonal scale factors for bromocarbons:
-38 BROMOCARB_SEASON /path/to/data/emis/BROMINE/BromoCarb_Season.nc CHXBRY_scale 2000/1-12/1/0 xy unitless 1 -
+# --- seasonal scale factors ---
+38 BROMOCARB_SEASON /home/ckeller/data/emis/BROMINE/BromoCarb_Season.nc CHXBRY_scale 2000/1-12/1/0 xy unitless 1
 
-# END OF SCALE FACTORS
+# --- GFED3 scale factors --- 
+121 GFED3_MONTHLY_AGW /home/ckeller/data/emis/GFED3/nc/2005/GFED3_monthly_2005.nc GFED3_BB__AGW_DM 2005/1-12/01/0 xy kg/m2/s 1
+128 GFED3_FRAC_DAY /home/ckeller/data/emis/GFED3/nc/2005/GFED3_frac_daily_2005.nc GFED3_BB__DAYFRAC 2005/1-12/1-31/0 xy unitless 1
+129 GFED3_FRAC_3HOUR /home/ckeller/data/emis/GFED3/nc/2005/GFED3_frac_3hourly_2005.nc GFED3_BB__HRFRAC 2005/1-12/01/* xy unitless 1
 
-####################################################################################
-### MASKS 
-####################################################################################
 #
+END SECTION SCALE FACTORS 
+
+####################################################################################
+BEGIN SECTION MASKS 
+####################################################################################
 # ScalID Name sourceFile sourceVar sourceTime SrcDim SrcUnit Oper Lon1/Lat1/Lon2/Lat2
-1000 EMEP_MASK   /path/to/data/emis/MASKS/nc/EMEP_mask.geos.1x1.nc           MASK */*/*/* xy xxx 1 -30/30/45/70
+
+# Country/region masks
+1000 EMEP_MASK   /home/ckeller/data/emis/MASKS/nc/EMEP_mask.geos.1x1.nc MASK */*/*/* xy unitless 1 -30/30/45/70
 
 #
-# END OF MASKS 
+END SECTION MASKS 
 
 ####################################################################################
-### SETTINGS
+BEGIN SECTION EXTENSION SWITCHES
 ####################################################################################
+# Make sure that the ExtNr provided here matches with the ExtNr provided in the base 
+# emissions sections. Otherwise, the listed files won't be read!
+
+# ExtNr ExtName    on/off Species 
+101     SeaFlux    on     CH3I/DMS/ACET 
+102     ParaNOx    on     NO/O3/HNO3
+103     LightnNOx  on     NO
+
 #
-Verbose:      false
-Logfile:      log.hemco
-#
-# END OF SETTINGS 
+END SECTION EXTENSION SWITCHES 
 
 ####################################################################################
-### EXTENSIONS SWITCHES
+BEGIN SECTION EXTENSION DATA
 ####################################################################################
-# For extensions using gridded data organized by HEMCO, make sure that these files 
-# are listed in the base emissions section and match the ExtNr of the respective 
-# extension!
-#
-# ExtName     on/off    ExtNr
-SeaFlux       off       101
-PARANOX       off       102
-LightNOx      off       103
-SoilNOx       off       104
-
-# END OF EXTENSIONS SWITCHES
-
-####################################################################################
-### EXTENSIONS DATA
-####################################################################################
+# ExtNr	Name sourceFile	sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier
 
 # --- Seawater concentrations for oceanic emissions (Extension 101) ---
-101 ACET_SEAWATER   /path/to/data/emis/ACET/nc/ACET_seawater.generic.1x1.nc ACET  2005/1/1/0    xy ngL ACET - 1 1
-101 DMS_SEAWATER    /path/to/data/emis/DMS/nc/DMS_seawater.geos.4x5.nc      DMS   1985/1-12/1/0 xy ngL DMS  - 1 1
-101 CH3I_SEAWATER   /path/to/data/emis/CH3I/nc/ocean_ch3i.geos.4x5.nc       CH3I  1985/1-12/1/0 xy ngL CH3I - 1 1
+101 CH3I_SEAWATER   /home/ckeller/data/emis/CH3I/nc/ocean_ch3i.geos.4x5.nc       CH3I  1985/1-12/1/0 xy ngL CH3I - 1 1
+101 DMS_SEAWATER    /home/ckeller/data/emis/DMS/nc/DMS_seawater.geos.4x5.nc      DMS   1985/1-12/1/0 xy xxx DMS  - 1 1
+101 ACET_SEAWATER   /home/ckeller/data/emis/ACET/nc/ACET_seawater.generic.1x1.nc ACET  2005/1/1/0    xy xxx ACET - 1 1 
 
 # --- PARANOX emissions (Extension 102) ---
-# Ship NO emissions will be assembled from all inventories listed below based upon 
-# the assigned hierarchies.
-102 ICOADS_SHIP_NO  /path/to/data/emis/ICOADS_SHIP/nc/ICOADS_ship.geos.1x1.nc    NO       2002/1-12/1/0   xy kg/m2/s NO  1/3  1 1
-102 EDGAR_SHIP_NO   /path/to/data/emis/EDGAR/nc/EDGAR.NO.generic.1x1.nc          NO.f5800 2000/1/1/0      xy kg/m2/s NO  1    1 2
-102 EMEP_SHIP_NO    /path/to/data/emis/EMEP/nc/EMEP.updt.ship.geos.1x1.nc        NO       1990-2007/1/1/0 xy kg/m2/s NO  1000 1 10
-
-# END OF EXTENSIONS DATA
-
+# List here NO ship emissions only. Ship NO emissions will be assembled from all 
+# inventories listed below based upon the assigned hierarchies.
+102 ICOADS_SHIP_NO  /home/ckeller/data/emis/ICOADS_SHIP/nc/ICOADS_ship.geos.1x1.nc    NO       2002/1-12/1/0   xy xxx NO  1/3  1 1
+102 EDGAR_SHIP_NO   /home/ckeller/data/emis/EDGAR/nc/EDGAR.NO.generic.1x1.nc          NO.f5800 2000/1/1/0      xy xxx NO  1    1 2
+102 EMEP_SHIP_NO    /home/ckeller/data/emis/EMEP/nc/EMEP.updt.ship.geos.1x1.nc        NO       1990-2007/1/1/0 xy xxx NO  1000 1 10
+#
+END SECTION EXTENSION DATA
+ 
 ### END OF HEMCO INPUT FILE ###
