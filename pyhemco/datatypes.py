@@ -277,6 +277,17 @@ class ObjectCollection(object):
                                selection)
         return self._create_subcollection(selection)
 
+    def get_all(self):
+        """
+        Select all objects in the collection.
+
+        Returns
+        -------
+        A new collection (:class:`ObjectCollection` instance) containing the
+        selected objects.
+        """
+        return self._create_subcollection(self._list)
+
     def get(self, *args, **kwargs):
         """
         Select one object based on its attributes.
