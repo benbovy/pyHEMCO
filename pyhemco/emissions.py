@@ -165,9 +165,6 @@ def base_emission_field(gc_field, name, timestamp, species, category,
     hierarchy : int
         Emission hierarchy. Higher hierarchy emissions will overwrite lower
         hierarchy emissions (if same category).
-    extension : :class:`EmissionExt` object or None
-        HEMCO extension to use with this emission field. Set None if the field
-        is to be used by the HCMO core.
     scale_factors : list :class:`GCField` objects
         Scale factors and masks to be applied to the base emission field.
         Each field in the list must have a 'emission_scale_factor' attribute.
@@ -193,7 +190,6 @@ def base_emission_field(gc_field, name, timestamp, species, category,
               'species': species,
               'category': int(category),
               'hierarchy': int(hierarchy),
-              'extension': extension,
               'scale_factors': scale_factors}
 
     e_field = _add_emission_attr(gc_field, name, BEF_ATTR_NAME,
@@ -306,25 +302,54 @@ class EmissionExt(object):
         Descriptive extension name.
     enabled : bool
         True if the extension is enabled
+    base_emission_fields : iterable or None
+        List of base emission fields (i.e., :class:`GCField` objects that have
+        a specific 'emission_base' field attribute) that will be used by the
+        extension.
     eid : int or None
-        Specify manually an ID to identify the extension.
+        Specify manually an ID to identify the extension. Note that 0
+        corresponds to HEMCO Core.
     """
 
-    def __init__(self, name, enabled=True, eid=None):
+    def __init__(self, name, enabled=True, base_emission_fields=None,
+                 eid=None):
         if eid is not None:
             eid = int(eid)
+        base_emission_fields = base_emission_fields or []
+        is_bef = lambda gcfield: is_base_emission_field(gcfield, critical=True)
+
         self.eid = eid
         self.name = str(name)
         self.enabled = bool(enabled)
+        self._base_emission_fields = ObjectCollection(base_emission_fields,
+                                                      ref_class=GCField,
+                                                      fpre=(is_bef, None))
+
+    @property
+    def base_emission_fields(self):
+        """
+        Base emission fields.
+
+        Returns
+        -------
+        A collection (:class:`datatypes.ObjectCollection`) of
+        base emission fields (i.e., :class:`GCField` objects that have a
+        specific 'emission_base' field attribute).
+
+        See Also
+        --------
+        :func:`base_emission_field`
+        """
+        return self._base_emission_fields
 
     def __str__(self):
         return "GC-Emission extension '{0}' ({1})" \
-            .format(self.name, str(self.eid or 'no-id'))
+            .format(self.name, str(self.eid))
 
     def __repr__(self):
         return '<{0}: {1} ({2})>'.format(self.__class__.__name__,
                                          self.name,
-                                         str(self.eid or 'no-id'))
+                                         str(self.eid))
 
 
 class Emissions(object):
@@ -334,106 +359,80 @@ class Emissions(object):
     Parameters
     ----------
     extensions : list of :class:`EmissionExt` objects
-        HEMCO extensions.
-    base_emission_fields : list of :class:`GCField` objects
-        Base emission fields.
+        HEMCO extensions (must include HEMCO Core).
+        Each extension can have base emission fields and each
+        base emission field can have scale factors and masks.
     description : string
         A short description of emission settings.
     extra_settings : dict or None
         Additional settings of HEMCO.
 
+    See Also
+    --------
+    :class:`EmissionExt`
+    :func:`base_emission_field`
+    :func:`scale_factor`
+
     """
 
-    def __init__(self, base_emission_fields, description="",
+    def __init__(self, extensions, description="",
                  extra_settings=None):
         extra_settings = extra_settings or {}
 
-        self._extensions = ObjectCollection(
-            [],
-            ref_class=EmissionExt,
-            fpre=(self._fpre_add_ext, self._fpre_remove_ext),
-            fpost=(None, None))
-
-        self._base_emission_fields = ObjectCollection(
-            base_emission_fields,
-            ref_class=GCField,
-            fpre=(self._fpre_add_bef, None),
-            fpost=(self._fpost_add_bef, None))
-
+        self._extensions = ObjectCollection(extensions, ref_class=EmissionExt)
         self.description = str(description)
         self.extra_settings = dict(extra_settings)
 
-    def _fpre_add_bef(self, gcfield):
+    @property
+    def extensions(self):
         """
-        Before adding a gcfield as a base emission field, check the gcfield
-        attributes.
-        """
-        return is_base_emission_field(gcfield, critical=True)
+        HEMCO extensions.
 
-    def _fpost_add_bef(self, bef):
+        Returns
+        -------
+        A collection (:class:`datatypes.ObjectCollection`) of extensions
+        (:class:`EmissionExt` objects) including HEMCO Core.
         """
-        After added a base emission field, add its assigned extension to
-        the emission setup (if needed).
-        """
-        bef_ext = bef[BEF_ATTR_NAME]['extension']
-        if bef_ext not in self._extensions:
-            self._extensions.add(bef_ext)
-
-    # def _fpost_remove_bef(self, bef):
-    #     """
-    #     After removed a base emission field, (eventually) remove its assigned
-    #     extension from the emission setup.
-    #     """
-    #     bef_ext = lambda ext: ext == bef[BEF_ATTR_NAME]['extension']
-    #     self._extensions.get(bef_ext).remove()
-
-    def _fpre_add_ext(self, ext):
-        """
-        Check if the extension has been already added to the emission setup.
-        """
-        try:
-            comp_ext = self._extensions.get_object(name=ext.name)
-            if comp_ext != ext:
-                raise ValueError("found the same {} extension with other "
-                                 "settings".format(ext.name))
-            else:
-                return False
-        except ValueError:
-            return True
-
-    def _fpre_remove_ext(self, ext):
-        """
-        Cannot remove an extension which involves at least one base emission
-        field.
-        """
-        bef_exts = [bef[BEF_ATTR_NAME]['extension']
-                    for bef in self._base_emission_fields]
-        if ext in bef_exts:
-            raise ValueError("Can not remove an extension that is referenced "
-                             "by at least one emission field")
+        return self._extensions
 
     @property
     def base_emission_fields(self):
         """
-        Base emission fields (collection of :class:`GCField` objects with a
-        specific 'emission_base' extra attribute).
+        Base emission fields.
+
+        Returns
+        -------
+        A read-only collection (:class:`datatypes.ObjectCollection`) of
+        base emission fields (i.e., :class:`GCField` objects that have a
+        specific 'emission_base' field attribute).
+        If a field is attached to several extensions, it appears only once
+        in the collection.
         
         See Also
         --------
-        :class:`datatypes.ObjectCollection`
         :func:`base_emission_field`
         """
-        return self._base_emission_fields
+        bef = []
+        for ext in self.extensions:
+            bef.extend(ext.base_emission_fields._list)
+        return ObjectCollection(set(bef), ref_class=GCField, read_only=True)
 
     @property
     def scale_factors(self):
         """
-        All scale factors (and masks) that are attached to the base emission
-        fields.
-        
-        Return a collection of :class:`GCField` objects (if a scale
-        factor is attached to several emission fields, it appears only once
-        in the list).
+        Scale factors and masks.
+
+        Returns
+        -------
+        A read-only collection (:class:`datatypes.ObjectCollection`) of
+        scale factors and masks (i.e., :class:`GCField` objects that have a
+        specific 'emission_scale_factor' field attribute).
+        If a scale factor is attached to several base emission fields, it
+        appears only once in the collection.
+
+        See Also
+        --------
+        :func:`scale_factor`
         """
         scale_factors = []
         for field in self.base_emission_fields:
@@ -442,17 +441,6 @@ class Emissions(object):
             scale_factors.extend(e_sf_list)
         return ObjectCollection(set(scale_factors), ref_class=GCField,
                                 read_only=True)
-
-    @property
-    def extensions(self):
-        """
-        HEMCO extensions (list of :class:`EmissionExt` objects).
-
-        Return a collection of :class:`EmissionExt` objects (if an extension
-        is attached to several emission fields, it appears only once
-        in the list). HEMCO Core is not included in the list.
-        """
-        return self._extensions
 
     def check_id(self):
         """
@@ -463,12 +451,15 @@ class Emissions(object):
                 for sf in self.scale_factors]
         if None in fids or len(set(fids)) != len(fids):
             # TODO: raise custom exception
-            raise ValueError("Missing or duplicate scale factor ID(s)")
+            raise ValueError("Missing or duplicate scale factor fid")
 
         eids = [ext.eid for ext in self.extensions]
         if None in eids or len(set(eids)) != len(eids):
             # TODO: raise custom exception
-            raise ValueError("Missing or duplicate extension ID(s)")
+            raise ValueError("Missing or duplicate extension eid")
+        if 0 not in eids:
+            # TODO: raise custom exception
+            raise ValueError("HEMCO Core (eid=0) not found in extensions")
 
     def resolve_id(self):
         """
