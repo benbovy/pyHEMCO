@@ -336,13 +336,15 @@ class EmissionExt(object):
         List of emitted species
     """
 
-    def __init__(self, name, enabled=True, eid=None, species=[]):
+    def __init__(self, name, enabled=True, eid=None, species=[], **kwargs):
         if eid is not None:
             eid = int(eid)
         self.eid = eid
         self.name = str(name)
         self.enabled = bool(enabled)
         self.species = species
+        self.settings = dict()
+        self.settings.update(kwargs)
 
     def __str__(self):
         return "GC-Emission extension '{0}' ({1})" \
@@ -352,7 +354,9 @@ class EmissionExt(object):
         return '<{0}: {1} ({2})>'.format(self.__class__.__name__,
                                          self.name,
                                          str(self.eid or 'no-id'))
-
+    def addSetting(self,attr_name,attr_val):
+        self.settings[attr_name] = attr_val
+    
 class Emissions(object):
     """
     Global emission settings.

@@ -62,7 +62,8 @@ class DatetimeSlicer(object):
     _str_dt_sep = '/'
     _str_value_sep = ','
     _str_range_sep = '-'
-    _str_wildcard_char = '*'
+#    _str_wildcard_char = '*'
+    _str_wildcard_charlist = ['*', 'YYYY', 'MM', 'DD', 'HH']
     
     def __init__(self, years, months, days, hours):
         self.years = list(years)
@@ -101,7 +102,7 @@ class DatetimeSlicer(object):
         str_list = fmt.split(self._str_dt_sep)
         for str_elem in str_list:
             dt_elem = []
-            if str_elem == self._str_wildcard_char:
+            if str_elem in self._str_wildcard_charlist:
                 args.append(dt_elem)
                 continue
             for val in str_elem.split(self._str_value_sep):
@@ -142,7 +143,7 @@ class DatetimeSlicer(object):
         str_list = []
         for dt_elem in (self.years, self.months, self.days, self.hours):
             if not dt_elem:
-                str_list.append(self._str_wildcard_char)
+                str_list.append(self._str_wildcard_charlist[0])
             elif len(dt_elem) == 1:
                 str_list.append(str(dt_elem[0]))
             elif dt_elem == list(range(min(dt_elem), max(dt_elem) + 1)):

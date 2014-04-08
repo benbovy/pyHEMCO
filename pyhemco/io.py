@@ -34,7 +34,7 @@ def find_substr_index( strings, substring ):
 def config_line_split( line, expLen=0, sep=' ' ):
     """
     Wrapper function to split line 'line' of the configuration file into substrings.
-    Arg 'sep' identified the substring separator character, and 'expLen' denotes 
+    Arg 'sep' identifies the substring separator character, and 'expLen' denotes 
     the expected number of substrings and can be set to provide an error check on 
     the passed line.
     """
@@ -455,18 +455,27 @@ def read_extensions( emis_setup, cfg_lines, start="BEGIN SECTION EXTENSION SWITC
             break        
         
         # split line
-        spl = config_line_split( cfg_lines[idx], expLen=4 )
+        spl = config_line_split( cfg_lines[idx], sep=':', expLen=2 )
         
         # empty list = this line is a comment
         if len(spl) == 0:
             idx=idx+1
             continue
         
+        # check for extension setting
+        if ('-->' in spl[0]):
+            if read_all or ExtUse:
+                thisext.addSetting(spl[0],spl[1])   
+            idx = idx+1
+            continue
+        
         # extract values
-        ExtNr   = int(spl[0])
-        ExtName = str(spl[1])
-        onoff   = str(spl[2])
-        species = spl[3].split('/')
+        spl0 = spl[0].split()
+        spl1 = spl[1].split()
+        ExtNr   = int(spl0[0])
+        ExtName = str(spl0[1])
+        onoff   = str(spl1[0])
+        species = spl1[1].split('/')
             
         if onoff.lower()=='on':
             ExtUse=True
@@ -474,7 +483,7 @@ def read_extensions( emis_setup, cfg_lines, start="BEGIN SECTION EXTENSION SWITC
             ExtUse=False
                 
         thisext = pyhemco.emissions.EmissionExt(ExtName, enabled=ExtUse, eid=ExtNr, species=species)
-                
+               
         # now read all base emissions belonging to this extension
         if read_all or ExtUse:
             read_base_emissions( emis_setup, cfg_lines, start="BEGIN SECTION EXTENSION DATA", 
@@ -727,8 +736,10 @@ def write_extensions( emis_setup, outfile, style ):
         else:
             onoff='off'
         species = '/'.join(iExt.species)
-        fldstr = ' '.join([str(iExt.eid), str(iExt.name), onoff, species])
+        fldstr = ' '.join([str(iExt.eid), str(iExt.name), ' :', onoff, species])
         outfile.write(fldstr+'\n')
+        for k, v in iExt.settings.items():
+            outfile.write(str(k)+': '+str(v)+'\n')        
     add_footer( outfile, 'EXTENSION SWITCHES')  
 
     # Extension data
