@@ -165,8 +165,7 @@ def is_scale_factor(gc_field, critical=False):
         
 
 def base_emission_field(gc_field, name, timestamp, species, category,
-                        hierarchy, extension=None, scale_factors=None,
-                        copy=False):
+                        hierarchy, scale_factors=None, copy=False):
 
     """
     Create a base emission field from an existing GEOS-Chem field.
@@ -336,7 +335,7 @@ class EmissionExt(object):
     """
 
     def __init__(self, name, enabled=True, base_emission_fields=None,
-                 eid=None):
+                 eid=None, species=[], **kwargs):
         if eid is not None:
             eid = int(eid)
         base_emission_fields = base_emission_fields or []
@@ -345,9 +344,15 @@ class EmissionExt(object):
         self.eid = eid
         self.name = str(name)
         self.enabled = bool(enabled)
+        self.species = species
         self._base_emission_fields = ObjectCollection(base_emission_fields,
                                                       ref_class=GCField,
                                                       fpre=(is_bef, None))
+        self.settings = dict()
+        self.settings.update(kwargs)
+
+    def addSetting(self,setting_name,setting_val):
+        self.settings[setting_name] = setting_val
 
     @property
     def base_emission_fields(self):
@@ -465,6 +470,14 @@ class Emissions(object):
             scale_factors.extend(e_sf_list)
         return ObjectCollection(set(scale_factors), ref_class=GCField,
                                 read_only=True)
+
+    def get_scalIDs(self):
+        """
+        Return a list of all currently defined scale factor IDs.
+        """
+        fids = [sf.attributes[SF_ATTR_NAME].get('fid')
+                for sf in self.scale_factors]
+        return fids
 
     def check_id(self):
         """

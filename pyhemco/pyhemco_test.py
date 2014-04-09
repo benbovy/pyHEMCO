@@ -14,7 +14,6 @@ setup1 = emissions.load_emissions_file(infile)
 setup1.save(outfile)
 setup2 = emissions.load_emissions_file(outfile)
 
-
 # manually create an emission setup
 
 # create setup first (fill afterwards)

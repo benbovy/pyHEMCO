@@ -80,7 +80,13 @@ def read_config_file( filename, description='' ):
         
     # read settings
     read_settings( emis_setup, cfg_lines )
-    read_base_emissions( emis_setup, cfg_lines )
+    
+    # read core emissions (and corresponding scale factors)
+    core_ext = pyhemco.emissions.EmissionExt('HEMCORE', eid=0, enabled=True)
+    emis_setup.extensions.add(core_ext)
+    read_base_emissions( emis_setup, cfg_lines, core_ext )
+    
+    # read extensions (and corresponding data & scale factors)
     read_extensions( emis_setup, cfg_lines, read_all=True)
     
     return emis_setup
@@ -182,9 +188,9 @@ def read_settings( emis_setup, cfg_lines,
         # increase index
         idx = idx+1
 
-def read_base_emissions( emis_setup, cfg_lines,
+def read_base_emissions( emis_setup, cfg_lines, extension,
                          start="BEGIN SECTION BASE EMISSIONS", end="END SECTION BASE EMISSIONS",
-                         extension=None, read_all=False ):
+                         read_all=True ):
     """
     Extracts the base emissions from cfg_lines and saves them into  
     emissions class object ('emis_setup'). If an extension is given, only the base
@@ -203,7 +209,7 @@ def read_base_emissions( emis_setup, cfg_lines,
         Start scanning file from this line
     end : [character]
         Scan file up to this line
-    extension: :class:`EmissionExt` object or None
+    extension: :class:`EmissionExt` object
         Only read fields belonging to this extension
     read_all : bool
         If False, reads only fields whose extension ID and species name match
@@ -246,14 +252,13 @@ def read_base_emissions( emis_setup, cfg_lines,
         srcunit = str(spl[6])
         modspc  = str(spl[7])
  
-        # For extensions, only consider data if it has the correct ExtNr and species ID!
-        if extension is not None:
-            if int(spl[0]) != extension.eid: 
-                idx=idx+1
-                continue
-            if not read_all and modspc not in extension.species:
-                idx=idx+1
-                continue
+        # Only consider data if it has the correct ExtNr and species ID!
+        if int(spl[0]) != extension.eid: 
+            idx=idx+1
+            continue
+        if not read_all and modspc not in extension.species:
+            idx=idx+1
+            continue
         
         if str(spl[8]) == "-":
             scalIDs = []
@@ -281,10 +286,10 @@ def read_base_emissions( emis_setup, cfg_lines,
                                             ndim=srcdim,
                                             data=data )        
         pyhemco.emissions.base_emission_field(basefld, basefld.name, srctime, 
-                                              modspc, cat, hier, extension=extension)
- 
-        # add to the setup
-        emis_setup.base_emission_fields.add(basefld)
+                                              modspc, cat, hier)
+
+        # add to the setup 
+        extension.base_emission_fields.add(basefld)
                 
         # add/link scale factors scalIDs
         fids = emis_setup.get_scalIDs()
@@ -482,7 +487,9 @@ def read_extensions( emis_setup, cfg_lines, start="BEGIN SECTION EXTENSION SWITC
         else:
             ExtUse=False
                 
+        # create extension and add to emission setup
         thisext = pyhemco.emissions.EmissionExt(ExtName, enabled=ExtUse, eid=ExtNr, species=species)
+        emis_setup.extensions.add(thisext)
                
         # now read all base emissions belonging to this extension
         if read_all or ExtUse:
@@ -501,7 +508,7 @@ def add_footer( outfile, section ):
     outfile.write('\n')
     outfile.write('END SECTION '+section+'\n') 
 
-def field2file( field, outfile, emis_setup, style ):
+def field2file( field, outfile, emis_setup, style, extension=None ):
     """
     Writes a GCField object (field) to a configuration file.
     
@@ -516,6 +523,8 @@ def field2file( field, outfile, emis_setup, style ):
     style : (string)
         file type. 'HEMCO' for a HEMCO-style file, 'ESMF' for 
         an ESMF-style file.
+    extension : :class:`EmissionExt` object.
+        The extension the field belongs to. None for scale factors.
 
     History
     ----------
@@ -557,11 +566,7 @@ def field2file( field, outfile, emis_setup, style ):
     
     # BASE FIELDS
     if isBase:
-        if attrs['extension'] is None:
-            fid = '0'
-        else:
-            fid = str(attrs['extension'].eid)
-            
+        fid  = str(extension.eid)
         spec = str(attrs['species'])
         cat  = str(attrs['category'])
         hier = str(attrs['hierarchy'])
@@ -642,10 +647,10 @@ def write_base_emissions( emis_setup, outfile, style ):
     
     add_header( outfile, 'BASE EMISSIONS')
     outfile.write('# ExtNr Name sourceFile sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier\n')
-    
-    for iField in emis_setup.base_emission_fields:
-        if not iField.is_extbase():
-            field2file( iField, outfile, emis_setup, style )
+     
+    core_ext = emis_setup.extensions.get_object(name='HEMCORE')
+    for iField in core_ext.base_emission_fields:
+        field2file( iField, outfile, emis_setup, style, core_ext )
         
     add_footer( outfile, 'BASE EMISSIONS')  
 
@@ -672,7 +677,7 @@ def write_scale_factors( emis_setup, outfile, style ):
     add_header( outfile, 'SCALE FACTORS')
     outfile.write('# ScalID Name sourceFile sourceVar sourceTime SrcDim SrcUnit Oper Scalar\n')
     
-    for iField in emis_setup.scale_factors:
+    for iField in emis_setup.scale_factors.sorted(key=lambda scal: scal.attributes[pyhemco.emissions.SF_ATTR_NAME]['fid']):
         if not iField.is_mask():
             field2file( iField, outfile, emis_setup, style )
         
@@ -701,7 +706,7 @@ def write_masks( emis_setup, outfile, style ):
     add_header( outfile, 'MASKS')
     outfile.write('# ScalID Name sourceFile sourceVar sourceTime SrcDim SrcUnit Oper Lon1/Lat1/Lon2/Lat2\n')
     
-    for iField in emis_setup.scale_factors:
+    for iField in emis_setup.scale_factors.sorted(key=lambda scal: scal.attributes[pyhemco.emissions.SF_ATTR_NAME]['fid']):
         if iField.is_mask():
             field2file( iField, outfile, emis_setup, style )
         
@@ -731,6 +736,8 @@ def write_extensions( emis_setup, outfile, style ):
     add_header( outfile, 'EXTENSION SWITCHES')
     outfile.write('# ExtNr ExtName     on/off Species\n')
     for iExt in emis_setup.extensions:
+        if iExt.eid == 0:
+            continue
         if iExt.enabled:
             onoff='on'
         else:
@@ -745,9 +752,11 @@ def write_extensions( emis_setup, outfile, style ):
     # Extension data
     add_header( outfile, 'EXTENSION DATA')
     outfile.write('# ExtNr Name sourceFile sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier\n')
-    for iField in emis_setup.base_emission_fields:
-        if iField.is_extbase():
-            field2file( iField, outfile, emis_setup, style )       
+    for iExt in emis_setup.extensions:
+        if iExt.eid == 0:
+            continue
+        for iField in iExt.base_emission_fields:
+            field2file( iField, outfile, emis_setup, style, iExt )       
     add_footer( outfile, 'EXTENSION DATA')      
       
 def strlist_to_fields(raw_vals, fields_spec, none_val=None):
