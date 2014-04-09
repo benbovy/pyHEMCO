@@ -29,8 +29,13 @@ class ObjectCollection(object):
     objects : iterable
         Objects to append to the list. All items in the iterable must be
         objects of a same class.
-    callbacks : (callable or None, callable or None)
-        Functions called when an object is (added to, removed from) the
+    fpre : (callable or None, callable or None)
+        Functions called before an object is (added to, removed from) the
+        collection. Each function must accepts one argument that must be any
+        instance of class `ref_class`, and must return True (add/remove
+        object) or False (don't add/remove object).
+    fpost : (callable or None, callable or None)
+        Functions called after an object is (added to, removed from) the
         collection. Each function must accepts one argument that must be any
         instance of class `ref_class`.
     read_only : bool
@@ -50,12 +55,14 @@ class ObjectCollection(object):
     An object cannot be inserted more than once in a collection.
     """
 
-    def __init__(self, objects, callbacks=(None, None),
+    def __init__(self, objects,
+                 fpre=(None, None), fpost=(None, None),
                  read_only=False, ref_class=None):
 
         self._ref_class = ref_class
         self._list = []
-        self._callback_add, self._callback_remove = callbacks
+        self._fpre_add, self._fpre_remove = fpre
+        self._fpost_add, self._fpost_remove = fpost
         self._ref_collection = None
         self._read_only = False
 
@@ -125,6 +132,11 @@ class ObjectCollection(object):
         ValueError
             If `obj` is already in the collection.
         """
+        if self._fpre_add is not None:
+            proceed = self._fpre_add(obj)
+            if not proceed:
+                return
+
         if self._ref_class is None:
             self._ref_class = obj.__class__
         self._check_read_only()
@@ -140,8 +152,9 @@ class ObjectCollection(object):
             self._list.append(obj)
         else:
             self._list.insert(index, obj)
-        if self._callback_add is not None:
-            self._callback_add(obj)
+
+        if self._fpost_add is not None:
+            self._fpost_add(obj)
 
     def extend(self, objs):
         """
@@ -179,9 +192,13 @@ class ObjectCollection(object):
         self._check_read_only()
         ref = self._get_ref_collection_or_error()
         for obj in self._list:
+            if ref._fpre_remove is not None:
+                proceed = ref._fpre_remove(obj)
+                if not proceed:
+                    continue
             ref._list.remove(obj)
-            if ref._callback_remove is not None:
-                ref._callback_remove(obj)
+            if ref._fpost_remove is not None:
+                ref._fpost_remove(obj)
 
     def index(self):
         """
@@ -259,6 +276,17 @@ class ObjectCollection(object):
             selection = filter(lambda obj: getattr(obj, attr_name) == attr_val,
                                selection)
         return self._create_subcollection(selection)
+
+    def get_all(self):
+        """
+        Select all objects in the collection.
+
+        Returns
+        -------
+        A new collection (:class:`ObjectCollection` instance) containing the
+        selected objects.
+        """
+        return self._create_subcollection(self._list)
 
     def get(self, *args, **kwargs):
         """
