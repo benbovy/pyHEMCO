@@ -150,7 +150,7 @@ def is_base_emission_field(gc_field, critical=False):
 
 def is_scale_factor(gc_field, critical=False):
     """
-    Check whether `gc_field` (a :class:`GCField` object) has scale factor or
+    Check if `gc_field` (a :class:`GCField` object) has scale factor or
     mask metadata.
 
     Will raise an error if `critical` is True and no scale factor attribute

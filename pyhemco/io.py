@@ -309,7 +309,7 @@ def read_base_emissions( emis_setup, cfg_lines, extension,
                     msg='Cannot get scale factor with ID ' + str(thisID)
                     raise ValueError(msg) 
             else:                
-                filter_scal = lambda field: field.attributes['emission_scale_factor']['fid'] == thisID
+                filter_scal = lambda field: field.attributes[pyhemco.emissions.SF_ATTR_NAME]['fid'] == thisID
                 scalfield = emis_setup.scale_factors.filter(filter_scal).get_object()
             
             basefld.emission_scale_factors.add(scalfield)
