@@ -82,23 +82,28 @@ class GCField(object):
             return deepcopy(self)
         else:
             return copy(self)
-        
+
+
+    def is_base(self):
+        """Returns True if this is a base field."""
+        isbase = False
+        if BEF_ATTR_NAME in self.attributes.keys():
+            isbase = True
+        return isbase
+
+    def is_scal(self):
+        """Returns True if this is a scale factor field."""
+        isscal = False
+        if SF_ATTR_NAME in self.attributes.keys():
+            isscal = True
+        return isscal
+               
     def is_mask(self):
-        """Returns True if this is a mask scale factor, False otherwise."""
+        """Returns True if this is a mask field."""
         ismask = False
-        
         if SF_ATTR_NAME in self.attributes.keys():
             ismask = 'mask_window' in self.attributes[SF_ATTR_NAME].keys()
-            
         return ismask
-
-    def is_extbase(self):
-        """Returns True if this is a base field belonging to an extension, 
-        False otherwise."""
-        isextbase = False
-        if BEF_ATTR_NAME in self.attributes.keys():
-            isextbase = self.attributes[BEF_ATTR_NAME]['extension'] is not None  
-        return isextbase
         
     def __str__(self):
         return 'GCField {}'.format(self.name or self.var_name)
@@ -393,8 +398,6 @@ class Emissions(object):
         base emission field can have scale factors and masks.
     description : string
         A short description of emission settings.
-    extra_settings : dict or None
-        Additional settings of HEMCO.
 
     See Also
     --------
@@ -404,13 +407,10 @@ class Emissions(object):
 
     """
 
-    def __init__(self, extensions, description="",
-                 extra_settings=None):
-        extra_settings = extra_settings or {}
-
+    def __init__(self, extensions=[], description=""):
         self._extensions = ObjectCollection(extensions, ref_class=EmissionExt)
         self.description = str(description)
-        self.extra_settings = dict(extra_settings)
+        self.name = str(self.description)
 
     @property
     def extensions(self):

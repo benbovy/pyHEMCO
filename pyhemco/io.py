@@ -15,6 +15,7 @@ import pyhemco
 
 SEPARATOR = '####################################################################################'
 COMMENT = '#'
+EXTSETTING_PREFIX = '--> '
 
 #-----------------------------------------------------------------------------
 # HEMCO I/O functions
@@ -77,12 +78,14 @@ def read_config_file( filename, description='' ):
     
     # open file
     cfg_lines = [line.rstrip('\n') for line in open(filename) if line.strip()]
+    
+    # create core extension. This one is needed by all setups.
+    core_ext = pyhemco.emissions.EmissionExt('Core', eid=0, enabled=True)
         
-    # read settings
-    read_settings( emis_setup, cfg_lines )
+    # read settings. Write them into settings section of core_ext.
+    read_settings( core_ext.settings, cfg_lines )
     
     # read core emissions (and corresponding scale factors)
-    core_ext = pyhemco.emissions.EmissionExt('HEMCORE', eid=0, enabled=True)
     emis_setup.extensions.add(core_ext)
     read_base_emissions( emis_setup, cfg_lines, core_ext )
     
@@ -128,16 +131,16 @@ def write_config_file( emis_setup, filename, style='HEMCO' ):
     outfile.write('### END OF HEMCO INPUT FILE ###\n')
     outfile.close()
 
-def read_settings( emis_setup, cfg_lines, 
+def read_settings( settings, cfg_lines, 
                    start="BEGIN SECTION SETTINGS", end="END SECTION SETTINGS" ):
     """
     Extracts the emission settings from cfg_lines and saves them into  
-    emissions class object ('emis_setup').
+    the passed dictionary (settings).
     
     Parameters
     ----------
-    emis_setup : :class:`Emissions` object.
-        The emissions setup object (to be created & filled).
+    settings : [dictionary] 
+        Dictionary where all the settings will be passed to.
     cfg_lines : [character]
         List of configuration file lines
     start : [character]
@@ -182,8 +185,8 @@ def read_settings( emis_setup, cfg_lines,
         elif dctval.lower()=='false':
             dctval=False
         
-        # add to emis_setup extra_settings dictionary
-        emis_setup.extra_settings.update({dctname: dctval})
+        # add to settings.
+        settings.update({dctname: dctval})
         
         # increase index
         idx = idx+1
@@ -242,23 +245,26 @@ def read_base_emissions( emis_setup, cfg_lines, extension,
             idx=idx+1
             continue
          
-        # extract values
+        # extract extension id, container name, and species ID
         eid     = int(spl[0])
         fldname = str(spl[1])
-        srcfile = str(spl[2])
-        srcvar  = str(spl[3])
-        srctime = str(spl[4])
-        srcdim  = str(spl[5])
-        srcunit = str(spl[6])
         modspc  = str(spl[7])
- 
+        
         # Only consider data if it has the correct ExtNr and species ID!
-        if int(spl[0]) != extension.eid: 
+        if eid != extension.eid: 
             idx=idx+1
             continue
-        if not read_all and modspc not in extension.species:
+        if modspc not in extension.species and not read_all:
             idx=idx+1
-            continue
+            continue        
+        
+        # Get file name. Use previous value if empty file name (-) is provided.
+        if str(spl[2]) != "-":
+          srcfile = str(spl[2])
+          srcvar  = str(spl[3])
+          srctime = str(spl[4])
+          srcdim  = str(spl[5])
+          srcunit = str(spl[6])
         
         if str(spl[8]) == "-":
             scalIDs = []
@@ -467,10 +473,11 @@ def read_extensions( emis_setup, cfg_lines, start="BEGIN SECTION EXTENSION SWITC
             idx=idx+1
             continue
         
-        # check for extension setting
-        if ('-->' in spl[0]):
+        # check for extension setting. Strip everything before (and including) the arrow
+        if (EXTSETTING_PREFIX in spl[0]):
             if read_all or ExtUse:
-                thisext.addSetting(spl[0],spl[1])   
+                key = spl[0].split(EXTSETTING_PREFIX)[1]
+                thisext.addSetting(key,spl[1])   
             idx = idx+1
             continue
         
@@ -508,7 +515,8 @@ def add_footer( outfile, section ):
     outfile.write('\n')
     outfile.write('END SECTION '+section+'\n') 
 
-def field2file( field, outfile, emis_setup, style, extension=None ):
+def field2file( field, outfile, emis_setup, style, extension=None, 
+                prevFile=None, prevVar=None, prevTime=None ):
     """
     Writes a GCField object (field) to a configuration file.
     
@@ -525,10 +533,16 @@ def field2file( field, outfile, emis_setup, style, extension=None ):
         an ESMF-style file.
     extension : :class:`EmissionExt` object.
         The extension the field belongs to. None for scale factors.
-
+    prevFile, prevVar, prevTime : (optional) file name, variable and
+         time stamp of the previously written file. If the attributes
+         of the passed field match these attributes, all file values
+         (name, variable, time, unit, dimension) are set to invalid
+         value (-). This causes HEMCO to use the same file data object
+         for all fields.
     History
     ----------
-    20140224 ckeller: Initial version    
+    20140224 ckeller: Initial version
+    20140517 ckeller: Added previous file attributes  
     """
     
     # base field or scale field?
@@ -563,6 +577,16 @@ def field2file( field, outfile, emis_setup, style, extension=None ):
         srcdim='xyz'
     else:
         raise ValueError('Illegal source dimension in '+fldname)
+    
+    # if file information are equivalent to the previous ones (passed as
+    # arguments), set all file information to invalid values (-). HEMCO
+    # will then use the same file data object for all emission fields.
+    if srcfile == prevFile and srcvar == prevVar and srctime == prevTime:
+        srcfile = '-'
+        srcvar  = '-'
+        srctime = '-'
+        srcdim  = '-'
+        srcunit = '-'
     
     # BASE FIELDS
     if isBase:
@@ -620,8 +644,9 @@ def write_settings( emis_setup, outfile, style ):
     """
     
     add_header( outfile, 'SETTINGS')
+    core_ext = emis_setup.extensions.get_object(name='Core')
     
-    for k, v in emis_setup.extra_settings.items():
+    for k, v in core_ext.settings.items():
         outfile.write(str(k)+': '+str(v)+'\n')
         
     add_footer( outfile, 'SETTINGS')  
@@ -648,9 +673,15 @@ def write_base_emissions( emis_setup, outfile, style ):
     add_header( outfile, 'BASE EMISSIONS')
     outfile.write('# ExtNr Name sourceFile sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier\n')
      
-    core_ext = emis_setup.extensions.get_object(name='HEMCORE')
+    core_ext = emis_setup.extensions.get_object(name='Core')
+    prevFile = ''
+    prevVar  = ''
+    prevTime = ''
     for iField in core_ext.base_emission_fields:
-        field2file( iField, outfile, emis_setup, style, core_ext )
+        field2file( iField, outfile, emis_setup, style, core_ext, prevFile, prevVar, prevTime )
+        prevFile = str(iField.filename)
+        prevVar  = str(iField.var_name)
+        prevTime = str(iField.attributes[pyhemco.emissions.BEF_ATTR_NAME]['timestamp'])
         
     add_footer( outfile, 'BASE EMISSIONS')  
 
@@ -736,7 +767,8 @@ def write_extensions( emis_setup, outfile, style ):
     add_header( outfile, 'EXTENSION SWITCHES')
     outfile.write('# ExtNr ExtName     on/off Species\n')
     for iExt in emis_setup.extensions:
-        if iExt.eid == 0:
+        # skip core extension: all settings already added to sections settings.
+        if iExt.eid == 0: 
             continue
         if iExt.enabled:
             onoff='on'
@@ -746,13 +778,14 @@ def write_extensions( emis_setup, outfile, style ):
         fldstr = ' '.join([str(iExt.eid), str(iExt.name), ' :', onoff, species])
         outfile.write(fldstr+'\n')
         for k, v in iExt.settings.items():
-            outfile.write(str(k)+': '+str(v)+'\n')        
+            outfile.write('   '+EXTSETTING_PREFIX+str(k)+': '+str(v)+'\n')        
     add_footer( outfile, 'EXTENSION SWITCHES')  
 
     # Extension data
     add_header( outfile, 'EXTENSION DATA')
     outfile.write('# ExtNr Name sourceFile sourceVar sourceTime SrcDim SrcUnit Species ScalIDs Cat Hier\n')
     for iExt in emis_setup.extensions:
+        # skip core extension: all fields already added to section base emissions.
         if iExt.eid == 0:
             continue
         for iField in iExt.base_emission_fields:

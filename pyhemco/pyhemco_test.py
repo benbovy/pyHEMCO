@@ -7,8 +7,8 @@ from pyhemco import emissions
 
 
 # read/write config file 
-infile = '/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/HEMCO_Config'
-outfile = '/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/HEMCO_Config.out'
+infile = '/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/HEMCO_Config.gf'
+outfile = '/Users/Christoph/Documents/PROJECTS/HEMCO/prog/PyProg/pyHEMCO/HEMCO_Config.gf.out'
 
 setup1 = emissions.load_emissions_file(infile)
 setup1.save(outfile)
