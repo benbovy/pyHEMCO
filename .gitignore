@@ -41,3 +41,6 @@ nosetests.xml
 
 # PyCharm
 .idea
+
+# notebooks checkpoints
+examples/notebooks/.ipynb_checkpoints
