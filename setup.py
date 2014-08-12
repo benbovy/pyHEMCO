@@ -2,12 +2,15 @@
 import os
 from distutils.core import setup
 
+import setuptools
+
 from pygchem import __version__, __project_url__
 
-NAME = 'PyGChem'
-LIBNAME = 'pygchem'
+NAME = 'PyHEMCO'
+LIBNAME = 'pyhemco'
 DATA_DIR = 'data'                   # path relative to LIBNAME
-EXCLUDE_DIRS = ('temp',)            # paths relative to LIBNAME
+EXCLUDE_DIRS = ()                   # paths relative to LIBNAME
+
 
 def get_package_data(name, extlist):
     """Return data files for package *name* with extensions in *extlist*"""
@@ -23,6 +26,7 @@ def get_package_data(name, extlist):
     print "Data files to install: %s" % ", ".join(flist)
     return flist
 
+
 def get_subpackages(name):
     """Return subpackages of package *name*"""
     splist = []
@@ -36,25 +40,29 @@ def get_subpackages(name):
     print "Packages and subpackages to install: %s" % ", ".join(splist)
     return splist
 
+
 def get_packages():
     """Return package list"""
-    packages = get_subpackages(LIBNAME)  # + get_subpackages('pygchemplugins')
+    packages = get_subpackages(LIBNAME)
     return packages
 
-setup(name=NAME,
-      version=__version__,
-      description='Python interface to GEOS-Chem 3D Chemistry Transport Model',
-      long_description=open('README.md').read(),
-      keywords='Interface GEOS-Chem Chemistry Transport Model CTM Atmospheric',
-      author='Benoit Bovy',
-      author_email='bbovy@ulg.ac.be',
-      license='GPLv3',
-      url=__project_url__,
-      download_url='%s/archive/%s.tar.gz' % (__project_url__, __version__),
-      platforms=['any'],
-      packages=get_packages(),
-      package_data={LIBNAME: get_package_data(os.path.join(LIBNAME, DATA_DIR),
-                                              ('.*'))},
-      scripts=[],
-      requires=["matplotlib (>= 1.1.0)",
-                "numpy (>= 1.5.0)"])
+
+setup(
+    name=NAME,
+    version=__version__,
+    description='Python API for the Harvard Emissions Component (HEMCO)',
+    long_description=open('README.md').read(),
+    keywords='API HEMCO Model CTM Atmospheric Emissions',
+    author=('Benoit Bovy <bbovy@ulg.ac.be>, '
+         'Christoff Keller <ckeller@seas.harvard.edu>'),
+    license='GPLv3',
+    url=__project_url__,
+    download_url='%s/archive/%s.tar.gz' % (__project_url__, __version__),
+    platforms=['any'],
+    packages=get_packages(),
+    #package_data={LIBNAME: get_package_data(os.path.join(LIBNAME, DATA_DIR),
+    #                                        ('.*'))},
+    scripts=[],
+    install_requires=["numpy>=1.7.0",
+                      "python-dateutil>=1.5"]
+)
