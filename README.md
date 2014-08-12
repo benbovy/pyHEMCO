@@ -1,7 +1,7 @@
 PyHEMCO
 =======
 
-A Python API for the Harvard Emissions Component (HEMCO).
+A Python API for the Harvard-NASA Emissions Component (HEMCO).
  
 HEMCO's Github repository: <https://github.com/christophkeller/hemco>.
 
@@ -26,5 +26,5 @@ See LICENSE.txt for more information.
 Contact
 -------
 
-Benoît Bovy <bbovy@ulg.ac.be>
-Christoff Keller <ckeller@seas.harvard.edu>
+- Benoît Bovy <bbovy@ulg.ac.be>
+- Christoff Keller <ckeller@seas.harvard.edu>
