@@ -54,7 +54,7 @@ setup(
     long_description=open('README.md').read(),
     keywords='API HEMCO Model CTM Atmospheric Emissions',
     author=('Benoit Bovy <bbovy@ulg.ac.be>, '
-         'Christoff Keller <ckeller@seas.harvard.edu>'),
+            'Christoph Keller <ckeller@seas.harvard.edu>'),
     license='GPLv3',
     url=__project_url__,
     download_url='%s/archive/%s.tar.gz' % (__project_url__, __version__),

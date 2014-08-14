@@ -5,7 +5,7 @@ PyHEMCO
 
 A Python API for the Harvard Emissions Component (HEMCO).
 
-:copyright: Copyright 2013-2014 by Benoît Bovy and Christoff Keller.
+:copyright: Copyright 2013-2014 by Benoît Bovy and Christoph Keller.
 :license: GPLv3, see LICENSE.txt for details.
 
 """

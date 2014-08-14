@@ -17,7 +17,7 @@ emissions in atmospheric models. Geosci. Model Dev., 7, 1409-1417, 2014.
 License
 -------
 
-Copyright (C) 2013-2014 Benoît Bovy - Christoff Keller.
+Copyright (C) 2013-2014 Benoît Bovy - Christoph Keller.
 
 Licensed under the terms of the GPL License v3.
 See LICENSE.txt for more information.
@@ -27,4 +27,4 @@ Contact
 -------
 
 - Benoît Bovy <bbovy@ulg.ac.be>
-- Christoff Keller <ckeller@seas.harvard.edu>
+- Christoph Keller <ckeller@seas.harvard.edu>
